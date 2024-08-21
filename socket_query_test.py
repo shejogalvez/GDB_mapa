@@ -1,5 +1,7 @@
 import socket
 import struct
+import csv
+from io import StringIO
 
 IP = "localhost"
 PORT = 8080
@@ -10,8 +12,8 @@ s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 query = """// This query is asking for the age and name of people
 // that knows John having between 60 and 70 years old,
 // ordered by their age (ascending) and name (descending).
-MATCH (?x :pieza)
-RETURN ?x.contexto_historico, ?x.titulo_o_nombre_atribuido
+MATCH (?p :pais)<-(?x :pieza )->(?c :componente)
+RETURN ?p.name, ?c.peso_grs, ?x.contexto_historico
 LIMIT 1000"""
 
 
@@ -36,30 +38,24 @@ def send_query(host: str, port: int, query: str) -> str:
         print(f"{query_length=}")
 
         # recive mensaje de servidor
-        msg = bytes([0])
+        finished_byte = 0
         result = bytearray()
-        while (msg[0] == 0):
+        while (finished_byte < 128):
             msg = s.recv(BUFFER_SIZE)
+            finished_byte = msg[0]
             response_length = int.from_bytes(msg[1:3], 'little')
-            result+=(msg[3:response_length+1])
-            current_length += BUFFER_SIZE
-            print(f"{msg[0]=}, {response_length=}")
+            result+=(msg[3:response_length])
+            print(f"{finished_byte=}, {response_length=}")
         
 
         return result.decode()
 
-def parse_result(query_result: str) -> list[dict]:
+def parse_result(query_result: str):
 
-    result_list = query_result.split('\n')
-    print(result_list)
-    headers = result_list[0].split(',')
-    data = []
-    for row in result_list[1:]:
-        data.append({
-            pair[0]: pair[1] for pair in zip(headers, row.split(','))
-        })
-    print(len(data))
-    return data
+    f = StringIO(query_result)
+    reader = csv.reader(f, delimiter=',')
+    return reader
 
 result = send_query(IP, PORT, query)
-print(parse_result(result))
+for x in parse_result(result):
+    print(x)
