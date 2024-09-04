@@ -6,18 +6,13 @@ WB_PATH = "2024 Muestra inventario colecciones MAPA (1).xlsx"
 dataframe = pd.read_excel(WB_PATH)
 dataframe = dataframe.reset_index()
 
-COL_PAIS = "pais"
+COL_PAIS      = "pais"
 COL_LOCALIDAD = "localidad"
-COL_DEPOSITO = "deposito"
-COL_ESTANTE     = "estante"
-COL_CAJA    = "caja_actual"
+COL_CULTURA   = "filiacion_cultural"
+COL_DEPOSITO  = "deposito"
+COL_ESTANTE   = "estante"
+COL_CAJA      = "caja_actual"
 
-ATRIBUTOS_UBICACION = [
-    "deposito",
-    "estante",
-    "caja_anterior",
-    "caja_actual"
-]
 
 ATRIBUTOS_COMPONENTES = [
     "nombre_comun", 
@@ -29,7 +24,6 @@ ATRIBUTOS_COMPONENTES = [
     "tipologia",
     "funcion",
     "iconografia",
-    "bibliografia",
     "estado_de_conservacion"
 ]
 
@@ -44,6 +38,7 @@ ATRIBUTOS_PIEZAS = [
     "fecha_de_creacion",
     "contexto_historico",
     "notas",
+    "bibliografia",
     "avaluo",
     "tipo",
     "procedencia",
@@ -76,8 +71,48 @@ def get_attributes(row, atributes_columns: list[str], replace_dict: dict = None)
             result += f' {att}:{element}'
     return result
 
-pg_query = ""
-pg_edges = ""
+def dataframe_to_csv(df : pd.DataFrame, filename) -> None:
+    df.to_csv(f"neo4j/import/{filename}", index=False)
+
+def column_to_name_id_dict(df: pd.DataFrame, column_name: str, prefix="A"):
+    column_data = df[column_name].drop_duplicates().dropna()
+    return {name: f"{prefix}{index+1}" for index, name in enumerate(column_data)}
+
+
+def column_to_dataframe(df: pd.DataFrame, column_name, prefix="A") -> pd.DataFrame:
+    data = {
+        "id" : [f"{prefix}{index+1}" for _ in df[column_name].dropna()],
+        "name" : list(df[column_name].dropna())
+    }
+    return pd.DataFrame(data)
+
+def insert_id_column_to_df(df: pd.DataFrame, column_name: str, name_id_dict: dict, column_id_name="id", loc = 0) -> None:
+    id_data = [None if pd.isna(x) else name_id_dict[x] for x in df[column_name]]
+    df.insert(loc, column_id_name, id_data)
+
+def extract_name_id_from_df(df: pd.DataFrame, column_name, column_id_name) -> pd.DataFrame:
+    return df[[column_name, column_id_name]]
+
+def multi(df: pd.DataFrame, column_name, prefix):
+    name_id_dict = column_to_name_id_dict(df, column_name, prefix)
+
+    column_id_name = f"{column_name}_id"
+    insert_id_column_to_df(df, column_name, name_id_dict, column_id_name)
+    result_df = df[[column_name, column_id_name]].drop_duplicates()
+    dataframe_to_csv(result_df, f"{column_name}.csv")
+
+def add_reference_and_create_table(df: pd.DataFrame, column_name, name_id_dict):
+    column_id_name = f"{column_name}_id"
+    insert_id_column_to_df(df, column_name, name_id_dict, column_id_name)
+    result_df = df[[column_name, column_id_name]].drop_duplicates()
+    dataframe_to_csv(result_df, f"{column_name}.csv")
+
+def create_relation_dataframe(df: pd.DataFrame, column_name, prefix="A"):
+    df.insert()
+    col_df = df[column_name].drop_duplicates().dropna()
+    col_name_id = {name: f"{prefix}{index+1}" for index, name in enumerate(col_df)}
+    for name, id in col_name_id.items():
+        pg_query += f'{id} :pais name:"{name}"\n'
 
 
 piezas_df = dataframe
@@ -89,34 +124,9 @@ piezas_df = piezas_df.sort_values(by=['numero_de_inventario', 'blank_count'])
 # Drop duplicates, keeping the row with the least number of blank columns
 drop_duplicate_piezas_df = piezas_df.drop_duplicates(subset='numero_de_inventario', keep='first').drop(columns='blank_count')
 
-
-# TODO: Cambiar en mapa conceptual los campos de funcion, tipologia, iconografía, bibliografia(?), 
-for index, line in drop_duplicate_piezas_df.iterrows() :
-    id = get_row_piece_id(line)
-    attributes = get_attributes(line, ATRIBUTOS_PIEZAS, {'\n': '', '"': "'"})
-    piece_node_line = f'{id} :pieza {attributes}\n'
-    pg_query += piece_node_line
-
-for index, line in dataframe.iterrows() :
-    # create componentes nodes
-    id = get_row_component_id(line)
-    attributes = get_attributes(line, ATRIBUTOS_COMPONENTES, {'\n': '', '"': "'"})
-    comp_node_line = f'{id} :componente {attributes}\n'
-    pg_query += comp_node_line
-
-    pg_edges += f'{get_row_piece_id(line)}->{id} :compuesto_por\n'
-
-# extract distinct values from column pais
-pais_col_df = dataframe[COL_PAIS].drop_duplicates().dropna()
-pais_name_id = {name: f"pa{index+1}" for index, name in enumerate(pais_col_df)}
-for name, id in pais_name_id.items():
-    pg_query += f'{id} :pais name:"{name}"\n'
-
-# extract distinct values from column localidad
-loc_col_df = dataframe[COL_LOCALIDAD].drop_duplicates().dropna()
-loc_name_id = {name: f"loc{index+1}" for index, name in enumerate(loc_col_df)}
-for name, id in loc_name_id.items():
-    pg_query += f'{id} :localiudad name:"{name}"\n'
+# add id to single components
+component_id_column = [get_row_component_id(row) for _, row in dataframe.iterrows()]
+dataframe.insert(1, "component_id", component_id_column)
 
 
 deposito_name_id = dict()
@@ -148,22 +158,26 @@ for index, row in dataframe.iterrows():
             ubicacion_dict[estante_name_id[estante]].add(caja_name_id[caja])
         elif deposito in deposito_name_id:
             ubicacion_dict[deposito_name_id[deposito]].add(caja_name_id[caja])
-
-for name, id in deposito_name_id.items():
-    pg_query += f"{id} :deposito :ubicacion name:\"{name}\"\n"
-for name, id in estante_name_id.items():
-    pg_query += f"{id} :estante :ubicacion name:\"{name}\"\n"
-for name, id in caja_name_id.items():
-    pg_query += f"{id} :caja :ubicacion name:\"{name}\"\n"
-
+ubicacion_df = pd.concat([
+    pd.DataFrame(list(deposito_name_id.items()), columns=['value', 'id']).assign(labels='ubicacion,deposito'),
+    pd.DataFrame(list(estante_name_id.items()), columns=['value', 'id']).assign(labels='ubicacion,estante'),
+    pd.DataFrame(list(caja_name_id.items()), columns=['value', 'id']).assign(labels='ubicacion,caja')
+])
+dataframe_to_csv(ubicacion_df, 'ubicaciones.csv')
+# dataframe_to_csv(pd.DataFrame(list(deposito_name_id.items()), columns=['id', 'value']), "depositos.csv")
+# dataframe_to_csv(pd.DataFrame(list(estante_name_id.items()), columns=['id', 'value']) , "estantes.csv")
+# dataframe_to_csv(pd.DataFrame(list(caja_name_id.items()), columns=['id', 'value'])    , "cajas.csv")
 
 # parse relations between ubicacion nodes
-for contenedor, contenido in ubicacion_dict.items() :
+contenedor_list = []
+for contenedor, contenido in ubicacion_dict.items():
     for elemento in contenido: 
-        pg_edges += f"{contenedor}->{elemento} :contiene_ubicacion\n"
+        contenedor_list.append((contenedor, elemento))
+dataframe_to_csv(pd.DataFrame(list(contenedor_list), columns=['id_contenedor', 'id_contenido']), "ubicaciones_rel.csv")
 
 # parse relations between ubicacion and components
-for index, line in dataframe.iterrows() :
+componenteId_ubicacion = []
+for index, line in dataframe.iterrows():
     # obtain id
     id = get_row_component_id(line)
     # obtain leaf node from ubicacion
@@ -175,23 +189,8 @@ for index, line in dataframe.iterrows() :
         ubicacion = deposito_name_id[line[COL_DEPOSITO]]
     else:
         continue
-    pg_edges += f"{id}->{ubicacion} :ubicado_en\n"
-
-# parse relations between pais and piezas
-for index, line in drop_duplicate_piezas_df.iterrows() :
-    # create pieza nodes
-    id = f'P{line["numero_de_inventario"]}'
-    if not pd.isna(line[COL_PAIS]):
-        id2 = pais_name_id[line[COL_PAIS]]
-    pg_edges += f"{id}->{id2} :de_pais\n"
-
-# parse relations between loc and piezas
-for index, line in drop_duplicate_piezas_df.iterrows() :
-    # create pieza nodes
-    id = f'P{line["numero_de_inventario"]}'
-    if not pd.isna(line[COL_LOCALIDAD]):
-        id2 = loc_name_id[line[COL_LOCALIDAD]]
-    pg_edges += f"{id}->{id2} :de_localidad\n"
+    componenteId_ubicacion.append((id, ubicacion))
+dataframe_to_csv(pd.DataFrame(list(componenteId_ubicacion), columns=['id_componente', 'id_ubicacion']), "ubicacion_objetos.csv")
 
 
 # Detrminar forma de cada pieza y linkear
@@ -202,6 +201,7 @@ ATRIBUTOS_FORMAS = [
     "profundidad_cm",
     "diametro_cm"
 ]
+formas_propiedades = []
 for index, row in dataframe.iterrows():
     alto =     ATRIBUTOS_FORMAS[0]
     diametro = ATRIBUTOS_FORMAS[3]
@@ -225,17 +225,24 @@ for index, row in dataframe.iterrows():
                 forma = "cuerda"
             case _:
                 continue
-    atributos = get_attributes(row, ATRIBUTOS_FORMAS)
+    atributos = list(row[ATRIBUTOS_FORMAS])
     self_id = f"F{index}"
-    pg_query += f"{self_id} :forma :{forma} {atributos}\n"
-    pg_edges += f"{get_row_component_id(row)}->{self_id} :tiene_forma\n"
-pg_query += pg_edges
+    atributos.extend([self_id, get_row_component_id(row), f"forma,{forma}"])
+    formas_propiedades.append(atributos)
 
-# Open the file in write mode ('w') and write the string to it
-with open(os.path.join("C:/Users/shejo/Documents/GitHub/MillenniumDB/data", "MAPA-DB.txt"), "w", encoding="utf-8") as file:
-    file.write(pg_query)
-with open(os.path.join("MAPADB.txt"), "w", encoding="utf-8") as file:
-    file.write(pg_query)
+# export formas info
+dataframe_to_csv(pd.DataFrame(list(formas_propiedades), 
+                                columns=["alto_cm","ancho_cm","profundidad_cm","diametro_cm",'id', 'id_componente','labels']), 
+                                f"{forma}.csv"
+                            )
+multi(drop_duplicate_piezas_df, COL_PAIS, "PA")
+multi(drop_duplicate_piezas_df, COL_LOCALIDAD, "LOC")
+multi(drop_duplicate_piezas_df, COL_CULTURA, "CUL")
+dataframe_to_csv(drop_duplicate_piezas_df, "piezas.csv")
+
+dataframe.drop(columns=dataframe.columns[0], axis=1, inplace=True)
+dataframe_to_csv(dataframe, "all.csv")
+
 
 print("File created successfully!")
 
