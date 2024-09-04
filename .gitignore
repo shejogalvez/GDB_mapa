@@ -155,4 +155,5 @@ cython_debug/
 # 
 *.xlsx
 /random/*
-*.txt
+*.csv
+/neo4j/data
