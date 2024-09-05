@@ -98,7 +98,7 @@ def multi(df: pd.DataFrame, column_name, prefix):
 
     column_id_name = f"{column_name}_id"
     insert_id_column_to_df(df, column_name, name_id_dict, column_id_name)
-    result_df = df[[column_name, column_id_name]].drop_duplicates()
+    result_df = df[[column_name, column_id_name]].drop_duplicates().dropna()
     dataframe_to_csv(result_df, f"{column_name}.csv")
 
 def add_reference_and_create_table(df: pd.DataFrame, column_name, name_id_dict):
@@ -107,12 +107,6 @@ def add_reference_and_create_table(df: pd.DataFrame, column_name, name_id_dict):
     result_df = df[[column_name, column_id_name]].drop_duplicates()
     dataframe_to_csv(result_df, f"{column_name}.csv")
 
-def create_relation_dataframe(df: pd.DataFrame, column_name, prefix="A"):
-    df.insert()
-    col_df = df[column_name].drop_duplicates().dropna()
-    col_name_id = {name: f"{prefix}{index+1}" for index, name in enumerate(col_df)}
-    for name, id in col_name_id.items():
-        pg_query += f'{id} :pais name:"{name}"\n'
 
 
 piezas_df = dataframe
