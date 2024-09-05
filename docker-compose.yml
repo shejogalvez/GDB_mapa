@@ -1,0 +1,33 @@
+version: "3.9"
+services:
+  neo4j:
+    container_name: neo4j
+    image: neo4j:5.22.0
+    ports:
+      - 7474:7474
+      - 7687:7687
+    restart: always
+    volumes:
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+      - ./neo4j/plugins:/plugins
+      - ./neo4j/import:/var/lib/neo4j/import
+    env_file:
+      - .env
+  
+
+  back:
+    container_name: backend
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000" 
+    volumes:
+      - ./backend/:/code/back
+    env_file:
+      - .env
+    environment:
+      - NEO4J_HOSTNAME=neo4j
+    command:  >
+       sh -c "pip install -r ./requirements.txt &&
+              fastapi dev main.py --host 0.0.0.0 --port 8000"
