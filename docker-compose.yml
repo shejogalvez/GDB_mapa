@@ -22,6 +22,7 @@ services:
       context: ./backend
     ports:
       - "8000:8000" 
+    restart: always
     volumes:
       - ./backend/:/code/back
     env_file:
