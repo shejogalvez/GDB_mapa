@@ -1,10 +1,13 @@
 import pandas as pd
 import os
+from backend.db import db
 
-WB_PATH = "2024 Muestra inventario colecciones MAPA (1).xlsx"
+WB_PATH = "2024 Inventario Colecciones MAPA-PCMAPA (1).xlsx"
 
 dataframe = pd.read_excel(WB_PATH)
 dataframe = dataframe.reset_index()
+# cleans spaces in string fields
+dataframe = dataframe.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
 
 COL_PAIS      = "pais"
 COL_LOCALIDAD = "localidad"
@@ -12,12 +15,14 @@ COL_CULTURA   = "filiacion_cultural"
 COL_DEPOSITO  = "deposito"
 COL_ESTANTE   = "estante"
 COL_CAJA      = "caja_actual"
+COL_EXPO   = "exposiciones"
 
 
 ATRIBUTOS_COMPONENTES = [
     "nombre_comun", 
+    "nombre_especifico",
     "materialidad", 
-    "peso_grs", 
+    "peso_(gr)", 
     "tecnica",
     "marcas_o_inscripciones",
     "descripcion_fisica",
@@ -29,21 +34,19 @@ ATRIBUTOS_COMPONENTES = [
 
 ATRIBUTOS_PIEZAS = [
     #"numero_de_inventario", #ID
-    "numero_de_registro_anterior",
+    "numero_de registro_anterior",
     "coleccion",
     "clasificacion",
     "conjunto",
-    "titulo_o_nombre_atribuido",
     "autor",
     "fecha_de_creacion",
     "contexto_historico",
-    "notas",
+    "notas_investigacion",
     "bibliografia",
     "avaluo",
-    "tipo",
     "procedencia",
-    "fecha",
-    "Embalaje"
+    "donante",
+    "fecha_ingreso"
 ]
 
 
@@ -107,7 +110,21 @@ def add_reference_and_create_table(df: pd.DataFrame, column_name, name_id_dict):
     result_df = df[[column_name, column_id_name]].drop_duplicates()
     dataframe_to_csv(result_df, f"{column_name}.csv")
 
+# Initialize an empty dictionary to store ids where differences are found per column
+different_values_ids = {col: [] for col in ATRIBUTOS_PIEZAS}
 
+# Group by 'id' column
+grouped = dataframe.groupby('numero_de_inventario')
+
+# Iterate through each group
+for group_id, group in grouped:
+    for col in ATRIBUTOS_PIEZAS:
+        # Check if the values in the current column vary within the group
+        if group[col].nunique(True) > 1:
+            # If they do, add the id to the corresponding list for that column
+            different_values_ids[col].append(group_id)
+
+print(different_values_ids)
 
 piezas_df = dataframe
 
@@ -190,10 +207,11 @@ dataframe_to_csv(pd.DataFrame(list(componenteId_ubicacion), columns=['id_compone
 # Detrminar forma de cada pieza y linkear
 
 ATRIBUTOS_FORMAS = [
-    "alto_cm",
-    "ancho_cm",
-    "profundidad_cm",
-    "diametro_cm"
+    "alto_o_largo_(cm)",
+    "ancho_(cm)",
+    "profundidad_(cm)",
+    "diametro_(cm)",
+    'espesor_(mm)'
 ]
 formas_propiedades = []
 for index, row in dataframe.iterrows():
@@ -226,8 +244,8 @@ for index, row in dataframe.iterrows():
 
 # export formas info
 dataframe_to_csv(pd.DataFrame(list(formas_propiedades), 
-                                columns=["alto_cm","ancho_cm","profundidad_cm","diametro_cm",'id', 'id_componente','labels']), 
-                                f"{forma}.csv"
+                                columns=ATRIBUTOS_FORMAS + ['id', 'id_componente','labels']), 
+                                f"forma.csv"
                             )
 multi(drop_duplicate_piezas_df, COL_PAIS, "PA")
 multi(drop_duplicate_piezas_df, COL_LOCALIDAD, "LOC")
@@ -238,5 +256,12 @@ dataframe.drop(columns=dataframe.columns[0], axis=1, inplace=True)
 dataframe_to_csv(dataframe, "all.csv")
 
 
-print("File created successfully!")
+print("Files created successfully!")
 
+
+with open("import.cypher") as file:
+    queries = file.read().split(";\n")
+    for query in queries:
+        db.run_query(query)
+
+print("data imported to neo4j")
