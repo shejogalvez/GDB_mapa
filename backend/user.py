@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from passlib.pwd import genword
-from pydantic import BaseModel
+from models import User, UserInDB, RoleEnum
 from typing import List, Optional, Annotated
 from jose import jwt, JWTError
 from datetime import timedelta, datetime
@@ -36,26 +36,15 @@ users_db = {
     }
 }
 
-# Pydantic models
-class User(BaseModel):
-    username: str
-    full_name: Optional[str] = None
-    email: Optional[str] = None
-    role: str
-
-class UserInDB(User):
-    hashed_password: str
-    salt: Optional[str] = "" #TODO: not optional
-
 # Helper functions to authenticate and verify users
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_user(username: str):
     user = db.get_user(username)
-    if username not in users_db:
-        return None
-    user = users_db[username]
+    # if username not in users_db: # for use of test db
+    #     return None
+    # user = users_db[username]
     if user:
         return UserInDB(**user)
     return None
@@ -86,17 +75,17 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
         
 
 def get_admin_permission_user(current_user: Annotated[User, Depends(get_current_user)]):
-    if current_user.role == 'admin':
+    if current_user.role == RoleEnum.admin:
         return current_user
     raise HTTPException(status_code=403, detail="Permission denied: only administrator can access")
 
 def get_read_permission_user(current_user: Annotated[User, Depends(get_current_user)]):
-    if current_user.role in ['reader', 'writer', 'admin']:
+    if current_user.role in [RoleEnum.admin, RoleEnum.reader, RoleEnum.writer]:
         return current_user
     raise HTTPException(status_code=403, detail="Permission denied: No read access")
 
 def get_write_permission_user(current_user: Annotated[User, Depends(get_current_user)]):
-    if current_user.role in ['writer', 'admin']:
+    if current_user.role in [RoleEnum.admin, RoleEnum.writer]:
         return current_user
     raise HTTPException(status_code=403, detail="Permission denied: No write access")
 
@@ -122,12 +111,11 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     token = enconde_token({"username": user.username}, expires_delta= timedelta(minutes=120))
     return {"access_token": token, "token_type": "bearer"}
 
-#TODO: test
 @router.post("/user", dependencies=[Depends(get_admin_permission_user)])
-async def add_user(username: Annotated[str, Form()], password: Annotated[str, Form()]):
+async def add_user(username: Annotated[str, Form()], password: Annotated[str, Form()], role: Annotated[RoleEnum, Form()]):
     salt = genword(length=15, charset="ascii_72")
     hashed_password = pwd_context.hash(password + salt)
-    db.create_user(username, hashed_password, salt, "admin")
+    db.create_user(username, hashed_password, salt, role.value)
     return {"username": username}
 
 ## TEST ROUTES, TODO: DELETE
