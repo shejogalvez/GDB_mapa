@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from backend.db import db
+from backend import db
 
 WB_PATH = "2024 Inventario Colecciones MAPA-PCMAPA (1).xlsx"
 

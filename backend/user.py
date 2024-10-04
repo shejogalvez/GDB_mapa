@@ -7,7 +7,7 @@ from typing import List, Optional, Annotated
 from jose import jwt, JWTError
 from datetime import timedelta, datetime
 import os
-from db import db
+import db
 
 router = APIRouter()
 
@@ -53,9 +53,9 @@ def verify_password(plain_password, hashed_password):
 
 def get_user(username: str):
     user = db.get_user(username)
-    # if username not in users_db:
-    #     return None
-    # user = users_db[username]
+    if username not in users_db:
+        return None
+    user = users_db[username]
     if user:
         return UserInDB(**user)
     return None
