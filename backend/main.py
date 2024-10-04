@@ -1,12 +1,12 @@
 from typing import Annotated, Optional
-from fastapi import FastAPI, Query, Depends, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, Query, Depends, File, Form, UploadFile, HTTPException, Request
 import shutil
 import os
 
 import db
 import user
-from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user
-from models import NodeUpdate, PieceCreate
+from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user, get_current_user
+from models import NodeUpdate, PieceCreate, Log, UserInDB
 
 app = FastAPI()
 app.include_router(user.router)
@@ -16,6 +16,12 @@ UPLOAD_DIR = "uploaded_images"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
+async def request_to_log(request: Request, user: UserInDB) -> Log:
+    request_body = await request.body()
+    endpoint = request.url.path
+    request_method = request.method
+    return Log(username=user.username, endpoint=endpoint, request_method=request_method, request_body=request_body.decode("utf-8"))
+
 def upload_file(file: UploadFile, file_path: str):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -24,23 +30,23 @@ def upload_file(file: UploadFile, file_path: str):
 async def root():
     return list(db.get_all_nodes())
 
-@app.get("/pieces/")
+@app.get("/pieces/", dependencies=[Depends(get_read_permission_user)])
 async def get_pieces(skip: int = 0, limit: int = 0):
     return db.get_nodes_paginated(" :pieza", skip, limit)
 
-@app.get("/components/")
+@app.get("/components/", dependencies=[Depends(get_read_permission_user)])
 async def get_piece_components(piece_id: int):
     return db.get_piece_components(piece_id)
 
-@app.get("/pieces-by-nodes/")
+@app.get("/pieces-by-nodes/", dependencies=[Depends(get_read_permission_user)])
 async def get_piece_by_nodes(node_names: Annotated[list[str], Query()], nodes_label: str = ""):
     return db.filter_by_nodes_names_connected(node_names, "pieza", nodes_label)
 
-@app.get("/piece-connected-nodes/")
+@app.get("/piece-connected-nodes/", dependencies=[Depends(get_read_permission_user)])
 async def get_nodes_connected_to_piece(piece_id: int):
     return db.get_nodes_without_tag_connected_to_node("componente", "pieza", id = piece_id)
 
-@app.get("/component-connected-nodes/")
+@app.get("/component-connected-nodes/", dependencies=[Depends(get_read_permission_user)])
 async def get_nodes_connected_to_piece(component_id: str):
     return db.get_nodes_without_tag_connected_to_node("componente", "pieza", id = component_id)
 
@@ -51,10 +57,12 @@ async def edit_piece(node_update: NodeUpdate):
     
 
 @app.put("/add-piece", dependencies=[Depends(get_write_permission_user)])
-async def add_piece(node_create: Annotated[PieceCreate, Form()]):
+async def add_piece(request: Request, node_create: PieceCreate, user: Annotated[UserInDB, Depends(get_current_user)]):
+    log = request_to_log(request, user)
     result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
-    print(result)
-    return result
+    log = await log
+    logdb = db.create_log(log)
+    return logdb
 
 @app.delete("/pieza/", dependencies=[Depends(get_write_permission_user)])
 async def delete_piece(node_id):
@@ -64,7 +72,7 @@ async def delete_piece(node_id):
             with session.begin_transaction() as tx:
                 return db.detete_piece(tx, node_id, to_delete)
 
-@app.post("/upload-image/")
+@app.post("/upload-image/", dependencies=[Depends(get_write_permission_user)])
 async def upload_image(node_id: str = Form(...), file: UploadFile = File(...)):
     # Save the uploaded file to the server's local file system
     try:

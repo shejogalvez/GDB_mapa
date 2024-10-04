@@ -1,5 +1,5 @@
 from neo4j import EagerResult, GraphDatabase, Record, Transaction, Driver
-from models import PieceCreate, NodeCreate, SubNode
+from models import PieceCreate, NodeCreate, SubNode, Log
 import os
 
 # Set up the connection details
@@ -156,3 +156,12 @@ def detete_piece(tx: Transaction, id: str, labels_to_delete: list[str]):
             DETACH DELETE f, n, c
             """
     return tx.run(query, nodeId=id, allowedLabels=labels_to_delete)
+
+def create_log(log: Log):
+    query = """
+            MATCH (n :user {username: $username})
+            CREATE (l :log {endpoint: $endpoint, request_method: $request_method, request_body: $request_body}) <-[:change]- (n)
+            RETURN l
+            """
+    result = run_query(query, username=log.username, endpoint=log.endpoint, request_method=log.request_method, request_body=log.request_body)
+    return result
