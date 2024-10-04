@@ -26,7 +26,7 @@ CALL {
 }
 WITH a, row
 MATCH (b:componente {id: row.id_componente})
-CREATE (a)-[:tiene_forma]->(b);
+CREATE (a)<-[:tiene_forma]-(b);
 
 LOAD CSV WITH HEADERS FROM 'file:///pais.csv' AS row
 CREATE (:pais {id: row.pais_id, name: row.pais});

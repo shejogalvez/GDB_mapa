@@ -107,7 +107,7 @@ def create_component(tx, piece_id: str, component_id: str, subnodes: list[SubNod
     query = """
             MATCH (p :pieza {id: $piece_id})
             MERGE (c :componente {id: $nodeId}) <-[:compuesto_por]-(p)
-            MERGE (c) <-[:tiene_forma]- (f :forma)
+            MERGE (c) -[:tiene_forma]-> (f :forma)
             WITH *, $properties AS mainProps
             UNWIND mainProps AS properties
             SET c += properties
