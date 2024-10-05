@@ -102,7 +102,18 @@ def get_forma_properties(properties: dict[str, str]) -> dict[str, str]: # TODO: 
 def pydict_to_neo(parameters: dict) -> str:
     return ', '.join(f'{key}: {val if type(val) is not str else f'"{val}"'}' for key, val in parameters.items())
 
-def create_component(tx, piece_id: str, component_id: str, subnodes: list[SubNode], properties: dict[str, str]):
+# creates query to connect each node to the main node
+def parse_subnodes(subnodes: list[SubNode], main_node_key: str):
+    return "\n".join(
+    [f"""WITH DISTINCT {main_node_key}
+        optional MATCH ({main_node_key}) -[relation :{n.relation_label}]- ()
+        DELETE relation 
+        MERGE (k:{n.node_label} {{id: \"{n.node_id}\"}}) 
+        WITH DISTINCT {main_node_key}, k
+        SET k += {{{pydict_to_neo(n.properties)}}}
+        CREATE ({main_node_key}) -[:{n.relation_label}]-> (k)""" for n in subnodes])
+
+def create_component(piece_id: str, component_id: str, subnodes: list[SubNode], properties: dict[str, str], tx:Transaction =None):
     fp: dict = get_forma_properties(properties)
     query = """
             MATCH (p :pieza {id: $piece_id})
@@ -111,12 +122,15 @@ def create_component(tx, piece_id: str, component_id: str, subnodes: list[SubNod
             WITH *, $properties AS mainProps
             UNWIND mainProps AS properties
             SET c += properties
-            WITH f, $f_properties AS fProps 
+            WITH c, f, $f_properties AS fProps 
             UNWIND fProps AS f_properties
             SET f += f_properties
-            """ + "\n".join([f"MATCH k:{n.node_label} {{id: \"{n.node_id}\"}} WITH c, k MERGE (c) -[:{n.relation_label}]- (k) SET k += {{{pydict_to_neo(n.properties)}}}"] for n in subnodes)
-    #print(query)
-    return tx.run(query, piece_id=piece_id, nodeId=component_id, properties=properties, f_properties=fp)
+            """ + parse_subnodes(subnodes, "c") + "RETURN c"
+    print(query)
+    if tx:
+        return tx.run(query, piece_id=piece_id, nodeId=component_id, properties=properties, f_properties=fp)
+    else:
+        return run_query(query, piece_id=piece_id, nodeId=component_id, properties=properties, f_properties=fp)
 
 def create_update_piece(piece_id: str, components: list, subnodes: list[SubNode], properties: list[dict] ):
     results = []
@@ -131,11 +145,11 @@ def create_update_piece(piece_id: str, components: list, subnodes: list[SubNode]
                         WITH p, $properties AS mainProps
                         UNWIND mainProps as properties
                         SET p += properties
-                        """ + "\n".join([f"WITH p MERGE (p) -[:{n.relation_label}]- (k:{n.node_label} {{id: \"{n.node_id}\"}}) SET k += {{{pydict_to_neo(n.properties)}}}" for n in subnodes])
-                #print(query)
+                        """ + parse_subnodes(subnodes, "p") + "RETURN p"
+                print(query)
                 results.append(tx.run(query, nodeId=piece_id, properties=properties).single())
                 for component in components:
-                    result = create_component(tx, piece_id, component.id, component.connected_nodes, component.properties)
+                    result = create_component(piece_id, component.id, component.connected_nodes, component.properties, tx)
                     results.append(result.single())
                 tx.commit()
     return results

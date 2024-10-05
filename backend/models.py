@@ -1,11 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from typing import Annotated, Optional
 from fastapi import UploadFile, File
 from enum import Enum
 
+import json
+
 class SubNode(BaseModel):
     node_id: str
-    properties: dict[str, str]
+    properties: dict[str, str | int | bool]
     relation_label: str
     node_label: str
 
@@ -13,7 +15,13 @@ class NodeCreate(BaseModel):
     id: Optional[str] = None
     properties: dict[str, str]  # Properties to update on the main node
     connected_nodes: list[SubNode]  # Each connected node and its properties
-    image: Optional[UploadFile] = None
+    
+    @model_validator(mode='before')
+    @classmethod
+    def validate_to_json(cls, value):
+        if isinstance(value, str):
+            return cls(**json.loads(value))
+        return value
 
 class NodeUpdate(NodeCreate):
     node_id: str
