@@ -32,3 +32,16 @@ services:
     command:  >
        sh -c "pip install -r ./requirements.txt &&
               fastapi dev main.py --host 0.0.0.0 --port 8000"
+
+  front:
+    container_name: frontend_vue
+    build:
+      context: ./frontend
+    ports:
+      - 3000:8000
+    volumes:
+      - ./frontend/:/code/front
+      - /code/front/node_modules
+    command: npm run dev
+    env_file:
+      - ./frontend/config/.env
