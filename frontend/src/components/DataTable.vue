@@ -1,9 +1,9 @@
 <template>
     <div>
-      <h1>Excel-like Data Table</h1>
+      <h1>Piezas</h1>
       
       <!-- Filter Input -->
-      <input v-model="filterText" placeholder="Filter by name..." @input="filterRows" />
+      <input v-model="filterText" placeholder="Filter by id..." @input="filterRows" />
   
       <!-- Data Table -->
       <table>
@@ -11,18 +11,20 @@
           <tr>
             <th>Select</th>
             <th>ID</th>
-            <th>Name</th>
-            <th>Age</th>
-            <th>Job</th>
+            <th>Pais</th>
+            <th>Localidad</th>
+            <th>Afiliacion Cultural</th>
+            <th>Exposiciones</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, index) in filteredRows" :key="row.id">
+          <tr v-for="row in filteredRows" :key="row.pieza.id">
             <td><input type="checkbox" v-model="selectedRows" :value="row" /></td>
-            <td>{{ row.id }}</td>
-            <td>{{ row.name }}</td>
-            <td>{{ row.age }}</td>
-            <td>{{ row.job }}</td>
+            <td>{{ row.pieza.id }}</td>
+            <td>{{ row.pais }}</td>
+            <td>{{ row.loc }}</td>
+            <td>{{ row.filiacion_cultural }}</td>
+            <td>{{ row.exp }}</td>
           </tr>
         </tbody>
       </table>
@@ -31,7 +33,7 @@
       <div v-if="selectedRows.length > 0">
         <h2>Selected Rows:</h2>
         <ul>
-          <li v-for="row in selectedRows" :key="row.id">{{ row.name }} ({{ row.job }})</li>
+          <li v-for="row in selectedRows" :key="row.pieza.id">{{ row.pieza.id }}</li>
         </ul>
       </div>
     </div>
@@ -53,6 +55,7 @@
       async fetchData() {
         try {
           const response = await axios.get('http://localhost:8000/');
+          console.log(response)
           this.rows = response.data;
           this.filteredRows = this.rows; // Initialize the filtered rows
         } catch (error) {
@@ -62,7 +65,8 @@
       filterRows() {
         // Filter rows based on filterText input
         const filter = this.filterText.toLowerCase();
-        this.filteredRows = this.rows.filter(row => row.name.toLowerCase().includes(filter));
+        this.filteredRows = this.rows.filter(row => row.id.includes(filter));
+        console.log(this.selectedRows)
       }
     },
     mounted() {

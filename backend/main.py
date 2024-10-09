@@ -1,5 +1,6 @@
 from typing import Annotated, Optional, List
 from fastapi import FastAPI, Query, Depends, Body, File, Form, UploadFile, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
 import json
@@ -13,6 +14,19 @@ from models import NodeUpdate, PieceCreate, Log, UserInDB, BaseModel, NodeCreate
 
 app = FastAPI()
 app.include_router(user.router)
+
+origins = [
+    "http://localhost",
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Directory where images will be stored
 UPLOAD_DIR = "uploaded_images"
@@ -30,7 +44,9 @@ def upload_file(file: UploadFile, file_path: str):
 
 @app.get("/")
 async def root():
-    return list(db.get_all_nodes())
+    result = list(db.get_pieces_info_paginated(3875, 25))
+    print(result[0])
+    return result
 
 @app.get("/pieces/", dependencies=[Depends(get_read_permission_user)])
 async def get_pieces(skip: int = 0, limit: int = 0):
@@ -51,6 +67,13 @@ async def get_nodes_connected_to_piece(piece_id: int):
 @app.get("/component-connected-nodes/", dependencies=[Depends(get_read_permission_user)])
 async def get_nodes_connected_to_piece(component_id: str):
     return db.get_nodes_without_tag_connected_to_node("componente", "pieza", id = component_id)
+
+@app.get("/nodes/")
+def get_nodes_filtered(tag: Annotated[str, Query()], keys: Annotated[list[str], Query()], vals: Annotated[list[str], Query()]):
+    # tag = params["tag"]
+    # property_filter = json.decoder.JSONDecoder().decode(params["property_filter"])
+    return db.get_all_nodes_property_filter(tag, dict(zip(keys, vals)))
+    return params
 
 @app.put("/edit-piece/", dependencies=[Depends(get_write_permission_user)])
 async def edit_piece(node_update: NodeUpdate):
@@ -80,7 +103,7 @@ async def add_component(request: Request,
         file_properties = {"size" : file.size}
         file_node = SubNode(node_id= file_path, properties=file_properties, relation_label="has_image", node_label="image")
         node_create.connected_nodes.append(file_node)
-    result = db.create_component(piece_id, node_create.id, node_create.connected_nodes, node_create.properties)
+    result = db.create_update_component(piece_id, node_create.id, node_create.connected_nodes, node_create.properties)
     log = request_to_log(request, user, node_create)
     logdb = db.create_log(log)
     return result

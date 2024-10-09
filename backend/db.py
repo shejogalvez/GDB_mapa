@@ -7,6 +7,9 @@ uri = f"bolt://{ os.getenv("NEO4J_HOSTNAME", "localhost") }:7687"  # Bolt URI of
  
 username, password = os.getenv("NEO4J_AUTH").split('/')  # Your Neo4j username
 
+def _get_data_only(result):
+    return result.data()
+
 # returns instance of driver to be used on backend
 def get_db_driver() -> Driver:
     return GraphDatabase.driver(uri, auth=(username, password))
@@ -14,7 +17,7 @@ def get_db_driver() -> Driver:
 # Initialize the driver
 def run_query(query: str, **kwarws) -> EagerResult:
     with GraphDatabase.driver(uri, auth=(username, password)) as driver:
-        return driver.execute_query(query, kwarws, database_="neo4j")
+        return driver.execute_query(query, kwarws, database_="neo4j", result_transformer_=_get_data_only)
 
 def parse_properties(**properties):
     return f", ".join([f"{key}:{f'"val"' if type(val)==str else val}" for key, val in properties.items()])
@@ -26,8 +29,14 @@ def get_all_nodes():
     return result
 
 def get_all_nodes_with_tag(tag: str | None = None, limit: int = 25):
-    query = f"MATCH (n {f":{tag}" if tag else ""}) RETURN n LIMIT {limit}" 
-    result = run_query(query)
+    query = f"MATCH (n {f":{tag}" if tag else ""}) RETURN n LIMIT $limit" 
+    result = run_query(query, limit=limit)
+    return result
+
+def get_all_nodes_property_filter(tag: str | None = None, properties_filter: dict = None, limit: int = 100):
+    properties_filter_clause = "WHERE "+",".join([f"n.{key} contains(\"{val}\")" for key, val in properties_filter.items()]) if properties_filter else ""
+    query = f"MATCH (n {f":{tag}" if tag else ""}) {properties_filter_clause} RETURN n LIMIT $limit" 
+    result = run_query(query, limit=limit, properties_filter=properties_filter)
     return result
 
 def get_nodes_without_tag_connected_to_node(exclude_tag: str, node_tag = "", **match_properties):
@@ -43,6 +52,19 @@ def get_nodes_paginated(labels: str, skip: int, limit: int):
             RETURN i
             SKIP {skip}
             {f"LIMIT {limit}" if limit>0 else ""}"""
+    result = run_query(query)
+    return result
+
+def get_pieces_info_paginated(skip: int, limit: int):
+    query= f"""
+MATCH (n: pieza)
+OPTIONAL MATCH (n) -[]-> (pais:pais)
+OPTIONAL MATCH (n) -[]-> (loc:localidad)
+OPTIONAL MATCH (n) -[]-> (exp:exposicion)
+OPTIONAL MATCH (n) -[]-> (cul:cultura)
+RETURN n as pieza, pais.name as pais, loc.name as loc, cul.name as filiacion_cultural, exp
+SKIP {skip}
+{f"LIMIT {limit}" if limit>0 else ""}"""
     result = run_query(query)
     return result
 
@@ -87,7 +109,7 @@ def get_user(username: str) -> Record | None:
     records = run_query(query).records
     return records[0]['n'] if records else None
 
-def get_forma_properties(properties: dict[str, str]) -> dict[str, str]: # TODO: mover esto al backend(?)
+def _get_forma_properties(properties: dict[str, str]) -> dict[str, str]: # TODO: mover esto al backend(?)
     FORMA_KEYS = ["alto", "ancho", "profundidad", "peso"]
     forma_properties = {}
     to_delete = []
@@ -113,11 +135,15 @@ def parse_subnodes(subnodes: list[SubNode], main_node_key: str):
         SET k += {{{pydict_to_neo(n.properties)}}}
         CREATE ({main_node_key}) -[:{n.relation_label}]-> (k)""" for n in subnodes])
 
-def create_component(piece_id: str, component_id: str, subnodes: list[SubNode], properties: dict[str, str], tx:Transaction =None):
-    fp: dict = get_forma_properties(properties)
-    query = """
-            MATCH (p :pieza {id: $piece_id})
-            MERGE (c :componente {id: $nodeId}) <-[:compuesto_por]-(p)
+def create_update_component(piece_id: str, component_id: str | None, subnodes: list[SubNode], properties: dict[str, str], tx:Transaction =None):
+    fp: dict = _get_forma_properties(properties)
+    if (component_id):
+        clause = "MATCH (c :componente)<-[:compuesto_por]-(p) WHERE elementid(n) = $component_id"
+    else:
+        clause = "CREATE (c :componente)<-[:compuesto_por]-(p)"
+    query = f"""
+            MATCH (p :pieza) WHERE elementid(p) = $piece_id
+            {clause}
             MERGE (c) -[:tiene_forma]-> (f :forma)
             WITH *, $properties AS mainProps
             UNWIND mainProps AS properties
@@ -145,11 +171,11 @@ def create_update_piece(piece_id: str, components: list, subnodes: list[SubNode]
                         WITH p, $properties AS mainProps
                         UNWIND mainProps as properties
                         SET p += properties
-                        """ + parse_subnodes(subnodes, "p") + "RETURN p"
+                        """ + parse_subnodes(subnodes, "p") + "RETURN elementid(p), p"
                 print(query)
                 results.append(tx.run(query, nodeId=piece_id, properties=properties).single())
                 for component in components:
-                    result = create_component(piece_id, component.id, component.connected_nodes, component.properties, tx)
+                    result = create_update_component(piece_id, component.id, component.connected_nodes, component.properties, tx)
                     results.append(result.single())
                 tx.commit()
     return results
