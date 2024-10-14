@@ -22,9 +22,9 @@
             <td><input type="checkbox" v-model="selectedRows" :value="row" /></td>
             <td>{{ row.pieza.id }}</td>
             <td>{{ row.pais }}</td>
-            <td>{{ row.loc }}</td>
-            <td>{{ row.filiacion_cultural }}</td>
-            <td>{{ row.exp }}</td>
+            <td>{{ row.localidad }}</td>
+            <td>{{ row.cultura }}</td>
+            <td>{{ row.exposicion }}</td>
           </tr>
         </tbody>
       </table>

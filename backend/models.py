@@ -1,7 +1,8 @@
-from pydantic import BaseModel, model_validator
-from typing import Annotated, Optional
-from fastapi import UploadFile, File
+from pydantic import BaseModel, model_validator, Field
+from typing import Annotated, Optional, Any, Literal, List
+from fastapi import UploadFile, File, Query
 from enum import Enum
+from dataclasses import dataclass
 
 import json
 
@@ -49,3 +50,13 @@ class User(BaseModel):
 class UserInDB(User):
     hashed_password: str
     salt: Optional[str] = "" #TODO: not optional
+
+Operation = Literal['=', '>=', '<', 'contains']
+
+class Filter(BaseModel):
+    key: str 
+    operation: Operation
+    val: Any
+class QueryFilter(BaseModel):
+    label: Optional[str] = None
+    filters: list[Filter]

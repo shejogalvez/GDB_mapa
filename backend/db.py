@@ -1,5 +1,6 @@
-from neo4j import EagerResult, GraphDatabase, Record, Transaction, Driver
-from models import PieceCreate, NodeCreate, SubNode, Log
+from neo4j import EagerResult, GraphDatabase, Record, Transaction, Driver, Result
+from models import PieceCreate, NodeCreate, SubNode, Log, NODE_KEYS, QueryFilter, Filter
+from typing import Any
 import os
 
 # Set up the connection details
@@ -7,7 +8,7 @@ uri = f"bolt://{ os.getenv("NEO4J_HOSTNAME", "localhost") }:7687"  # Bolt URI of
  
 username, password = os.getenv("NEO4J_AUTH").split('/')  # Your Neo4j username
 
-def _get_data_only(result):
+def _get_data_only(result: Result):
     return result.data()
 
 # returns instance of driver to be used on backend
@@ -15,99 +16,14 @@ def get_db_driver() -> Driver:
     return GraphDatabase.driver(uri, auth=(username, password))
 
 # Initialize the driver
-def run_query(query: str, **kwarws) -> EagerResult:
+def run_query(query: str, database_="neo4j", **kwarws) -> EagerResult:
     with GraphDatabase.driver(uri, auth=(username, password)) as driver:
-        return driver.execute_query(query, kwarws, database_="neo4j", result_transformer_=_get_data_only)
+        return driver.execute_query(query, kwarws, database_=database_, result_transformer_=_get_data_only)
 
+## UTILS ##
+# Parse dict and returns str to match properties in cypher query
 def parse_properties(**properties):
-    return f", ".join([f"{key}:{f'"val"' if type(val)==str else val}" for key, val in properties.items()])
-
-# Example function to run a simple query
-def get_all_nodes():
-    query = "MATCH (n) RETURN n LIMIT 25"  # Cypher query to retrieve all nodes
-    result = run_query(query)
-    return result
-
-def get_all_nodes_with_tag(tag: str | None = None, limit: int = 25):
-    query = f"MATCH (n {f":{tag}" if tag else ""}) RETURN n LIMIT $limit" 
-    result = run_query(query, limit=limit)
-    return result
-
-def get_all_nodes_property_filter(tag: str | None = None, properties_filter: dict = None, limit: int = 100):
-    properties_filter_clause = "WHERE "+",".join([f"n.{key} contains(\"{val}\")" for key, val in properties_filter.items()]) if properties_filter else ""
-    query = f"MATCH (n {f":{tag}" if tag else ""}) {properties_filter_clause} RETURN n LIMIT $limit" 
-    result = run_query(query, limit=limit, properties_filter=properties_filter)
-    return result
-
-def get_nodes_without_tag_connected_to_node(exclude_tag: str, node_tag = "", **match_properties):
-    properties = parse_properties(match_properties)
-    query = f"""MATCH (n {f":{node_tag}" if node_tag else ""} {{{properties}}}) -[]-> (c)
-                WHERE NOT (c: {exclude_tag})
-                RETURN c""" 
-    result = run_query(query)
-    return result
-
-def get_nodes_paginated(labels: str, skip: int, limit: int):
-    query = f"""MATCH (i {labels})
-            RETURN i
-            SKIP {skip}
-            {f"LIMIT {limit}" if limit>0 else ""}"""
-    result = run_query(query)
-    return result
-
-def get_pieces_info_paginated(skip: int, limit: int):
-    query= f"""
-MATCH (n: pieza)
-OPTIONAL MATCH (n) -[]-> (pais:pais)
-OPTIONAL MATCH (n) -[]-> (loc:localidad)
-OPTIONAL MATCH (n) -[]-> (exp:exposicion)
-OPTIONAL MATCH (n) -[]-> (cul:cultura)
-RETURN n as pieza, pais.name as pais, loc.name as loc, cul.name as filiacion_cultural, exp
-SKIP {skip}
-{f"LIMIT {limit}" if limit>0 else ""}"""
-    result = run_query(query)
-    return result
-
-def get_piece_components(piece_id):
-    #TODO: save piece_id as int
-    query = f"""MATCH (:pieza {{id: "{piece_id}"}}) -[:compuesto_por]-> (i:componente)
-            RETURN i"""
-    result = run_query(query)
-    return result
-
-def filter_by_nodes_names_connected(name_array: list, tag: str, other_label: str = "", skip: int = 0, limit: int = 0):
-    if other_label != "":
-        other_label = f" :{other_label}" 
-    query = f"""MATCH (n:{tag})-[r]-(connectedNode{other_label})
-            WHERE connectedNode.name IN {name_array}
-            RETURN DISTINCT n;
-            SKIP {skip}
-            {f"LIMIT {limit}" if limit>0 else ""} """
-    print(query)
-    result = run_query(query)
-    return result
-
-""" to leave property as dict key in results:
-It's not possible with the default Cypher syntax, however if you have the apoc library installed, you can do this :
-
-MATCH (n:A)
-RETURN apoc.map.setKey({}, n.id, n{.*})"""
-
-def create_user(username: str, hashed_password: str, salt: str, role: str):
-    query = f"CREATE (n :user {{username: '{username}', hashed_password: '{hashed_password}', salt: '{salt}', role: '{role}'}})"
-    run_query(query)
-
-def create_node(tags: list[str] | None = None, **properties):
-    tags = f"".join(map(lambda x : f" :{x}", tags))
-    properties = parse_properties(properties)
-    query = f"CREATE (n{tags} {{{properties}}})"
-    run_query(query)
-
-def get_user(username: str) -> Record | None:
-    query = f"""MATCH (n:user {{username:"{username}"}})
-    RETURN n"""
-    records = run_query(query).records
-    return records[0]['n'] if records else None
+    return "{"+{", ".join([f"{key}:${key}" for key in properties])}+"}"
 
 def _get_forma_properties(properties: dict[str, str]) -> dict[str, str]: # TODO: mover esto al backend(?)
     FORMA_KEYS = ["alto", "ancho", "profundidad", "peso"]
@@ -134,6 +50,123 @@ def parse_subnodes(subnodes: list[SubNode], main_node_key: str):
         WITH DISTINCT {main_node_key}, k
         SET k += {{{pydict_to_neo(n.properties)}}}
         CREATE ({main_node_key}) -[:{n.relation_label}]-> (k)""" for n in subnodes])
+
+def parse_operation(operation_str: str, key: str) -> str:
+    match operation_str:
+        case "=":
+            return f"= ${key}"
+        case ">=":
+            return f">= ${key}"
+        case "<":
+            return f"< ${key}"
+        case "contains":
+            return f"contains(${key})"
+
+def parse_filters(args: dict[str, list[Filter]]) -> tuple[dict[str, str], dict[str, Any]]:
+    if (not args): return ""
+    # for each node type store WHERE statements filtering properties
+    query_expressions = dict()
+    for label, filters in args.items():
+        # create WHERE statement and append to dict
+        query_expression = "WHERE "
+        query_expression += " AND ".join((f"{label}.{x.key} {parse_operation(x.operation, f"{label}_{x.key}")}" for x in filters)) + "\n"
+        query_expressions[label] = query_expression
+        # create kwargs to add to execute_query()
+        query_kwargs = dict([(f"{label}_{x.key}", x.val) for x in filters])
+    return query_expressions, query_kwargs
+
+def where_clause_from_label(query_expressions: dict[str, str], label: str) -> str:
+    return query_expressions[label] if label in query_expressions else ""
+
+## DB QUERIES ##
+
+def get_all_nodes_property_filter(tag: str | None = None, properties_filter: dict[str, list[Filter]] = None, limit: int = 100, skip:int=0):
+    properties_filter_clause, query_kwargs = parse_filters(properties_filter)
+    query = f"MATCH (pieza {f":{tag}" if tag else ""}) {properties_filter_clause[tag]} RETURN pieza SKIP $skip LIMIT $limit" 
+    print(query, query_kwargs)
+    result = run_query(query, limit=limit, skip=skip, **query_kwargs)
+    return result
+
+def get_nodes_without_tag_connected_to_node(exclude_tag: str, node_tag = "", **match_properties):
+    properties = parse_properties(**match_properties)
+    query = f"""MATCH (n {f":{node_tag}" if node_tag else ""} {properties}) -[]-> (c)
+                WHERE NOT (c: {exclude_tag})
+                RETURN c""" 
+    print(query)
+    result = run_query(query, **match_properties)
+    return result
+
+def get_nodes_paginated(labels: str, skip: int, limit: int): #TODO: verify labels
+    query = f"""MATCH (i {labels})
+            RETURN i
+            SKIP $skip
+            LIMIT $limit"""
+    result = run_query(query, skip=skip, limit=max(limit, 0))
+    return result
+
+PIEZAS_RELATED_NODES = ["pais", "localidad", "exposicion", "cultura", "imagen"]
+
+def get_pieces_info_paginated(skip: int, limit: int):
+    query= f"""
+    MATCH (pieza: pieza)
+    {"\n".join(f"OPTIONAL MATCH (pieza) --> ({label}:{label})" for label in PIEZAS_RELATED_NODES)}
+    RETURN elementid(pieza) as id, pieza, pais, localidad, cultura, exposicion, imagen
+    SKIP $skip
+    {f"LIMIT $limit" if limit>0 else ""}"""
+    result = run_query(query, skip=skip, limit=limit)
+    return result
+
+def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], skip: int, limit: int):
+    properties_filter_clauses, query_kwargs = parse_filters(query_filters)
+    match_nodes_statement = f"MATCH (pieza: pieza) {where_clause_from_label(properties_filter_clauses)}"
+    for label in PIEZAS_RELATED_NODES:
+        match_nodes_statement += f"OPTIONAL MATCH (pieza) --> ({label}:{label}) {where_clause_from_label(properties_filter_clauses, label)}"
+    query= f"""
+    {match_nodes_statement}
+    RETURN elementid(pieza) as id, pieza, pais, localidad, cultura, exposicion, imagen
+    SKIP $skip
+    {f"LIMIT $limit" if limit>0 else ""}"""
+    result = run_query(query, skip=skip, limit=limit, **query_kwargs)
+    return result
+
+def get_piece_components(piece_id):
+    #TODO: save piece_id as int
+    query = f"""
+    MATCH (:pieza {{id: "{piece_id}"}}) -[:compuesto_por]-> (componente:componente)
+    OPTIONAL MATCH (componente) -[]-> (forma:forma)
+    OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
+    OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
+    RETURN  elementid(componente) as id, componente, forma, ubicacion, imagen"""
+    result = run_query(query)
+    return result
+
+def filter_by_nodes_names_connected(name_array: list, tag: str, other_label: str = "", skip: int = 0, limit: int = 0):
+    if other_label != "":
+        other_label = f" :{other_label}" 
+    query = f"""MATCH (n:{tag})-[r]-(connectedNode{other_label})
+            WHERE connectedNode.name IN {name_array}
+            RETURN DISTINCT n;
+            SKIP {skip}
+            {f"LIMIT {limit}" if limit>0 else ""} """
+    print(query)
+    result = run_query(query)
+    return result
+
+def create_user(username: str, hashed_password: str, salt: str, role: str):
+    query = f"CREATE (n :user {{username: '{username}', hashed_password: '{hashed_password}', salt: '{salt}', role: '{role}'}})"
+    run_query(query)
+
+def create_node(tags: list[str] | None = None, **properties):
+    tags = f"".join(map(lambda x : f" :{x}", tags))
+    properties_query = parse_properties(properties)
+    query = f"CREATE (n{tags} {properties_query})"
+    run_query(query, **properties)
+
+def get_user(username: str) -> Record | None:
+    query = f"""MATCH (n:user {{username:"{username}"}})
+    RETURN n"""
+    records = run_query(query)
+    return records[0]['n'] if records else None
 
 def create_update_component(piece_id: str, component_id: str | None, subnodes: list[SubNode], properties: dict[str, str], tx:Transaction =None):
     fp: dict = _get_forma_properties(properties)

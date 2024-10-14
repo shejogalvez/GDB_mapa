@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, List
+from typing import Annotated, Optional, List, Literal
 from fastapi import FastAPI, Query, Depends, Body, File, Form, UploadFile, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
@@ -10,7 +10,7 @@ from pydantic import model_validator
 import db
 import user
 from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user, get_current_user
-from models import NodeUpdate, PieceCreate, Log, UserInDB, BaseModel, NodeCreate, SubNode
+from models import NodeUpdate, PieceCreate, Log, UserInDB, BaseModel, NodeCreate, SubNode, Operation, QueryFilter, Filter
 
 app = FastAPI()
 app.include_router(user.router)
@@ -18,6 +18,9 @@ app.include_router(user.router)
 origins = [
     "http://localhost",
     "http://localhost:5173",
+    "http://localhost:3000",
+    "http://frontend_vue:3000",
+    "http://frontend_vue:8000",
 ]
 
 app.add_middleware(
@@ -61,31 +64,29 @@ async def get_piece_by_nodes(node_names: Annotated[list[str], Query()], nodes_la
     return db.filter_by_nodes_names_connected(node_names, "pieza", nodes_label)
 
 @app.get("/piece-connected-nodes/", dependencies=[Depends(get_read_permission_user)])
-async def get_nodes_connected_to_piece(piece_id: int):
+async def get_nodes_connected_to_piece(piece_id: str):
     return db.get_nodes_without_tag_connected_to_node("componente", "pieza", id = piece_id)
 
 @app.get("/component-connected-nodes/", dependencies=[Depends(get_read_permission_user)])
-async def get_nodes_connected_to_piece(component_id: str):
-    return db.get_nodes_without_tag_connected_to_node("componente", "pieza", id = component_id)
+async def get_nodes_connected_to_component(component_id: str):
+    return db.get_nodes_without_tag_connected_to_node("pieza", "componente", id = component_id)
 
-@app.get("/nodes/")
-def get_nodes_filtered(tag: Annotated[str, Query()], keys: Annotated[list[str], Query()], vals: Annotated[list[str], Query()]):
+@app.post("/pieces/")
+def get_pieces_filtered(query_filters: dict[str, list[Filter]], skip: int = 0, limit: int = 50):
     # tag = params["tag"]
     # property_filter = json.decoder.JSONDecoder().decode(params["property_filter"])
-    return db.get_all_nodes_property_filter(tag, dict(zip(keys, vals)))
+    return db.get_pieces_info_paginated_filtered(query_filters, skip, limit)
     return params
 
-@app.put("/edit-piece/", dependencies=[Depends(get_write_permission_user)])
-async def edit_piece(node_update: NodeUpdate):
-    # validate form??
-    ...
-    
 
 @app.put("/add-piece", dependencies=[Depends(get_write_permission_user)])
 def add_piece(request: Request, node_create: Annotated[PieceCreate, Body(...)], user: Annotated[UserInDB, Depends(get_current_user)], images: List[UploadFile] = File(...)):
     for file in images:
         file_path = os.path.join(UPLOAD_DIR, file.filename)
         upload_file(file, file_path)
+        file_properties = {"size" : file.size}
+        file_node = SubNode(node_id= file_path, properties=file_properties, relation_label="has_image", node_label="image")
+        node_create.connected_nodes.append(file_node)
     result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
     log = request_to_log(request, user, node_create)
     logdb = db.create_log(log)
@@ -142,30 +143,3 @@ async def upload_image(node_id: str = Form(...), file: UploadFile = File(...)):
 
     return {"message": f"Image uploaded and connected to node {node_id}", "file_path": file_path}
 
-class DataModelOut(BaseModel):
-    message: str = None
-    id: str = None
-    input_data: dict = None
-    result: List[dict] = []
-    statusCode: int
- 
- 
-class DataModelIn(BaseModel):
-    countryId: str
-    policyDetails: List[dict]
-    leaveTypeId: str
-    branchIds: List[str]
-    cityIds: List[str]
-
-    @model_validator(mode='before')
-    @classmethod
-    def validate_to_json(cls, value):
-        if isinstance(value, str):
-            return cls(**json.loads(value))
-        return value
-    
-
-@app.post('/', response_model=DataModelOut)
-def create_policy_details(data: DataModelIn = Body(...), files: List[UploadFile] = File(...)):
-    print('Files received: ', [f.filename for f in files])
-    return {'input_data': data.model_dump(), 'statusCode': status.HTTP_201_CREATED}
