@@ -1,5 +1,5 @@
 from neo4j import EagerResult, GraphDatabase, Record, Transaction, Driver, Result
-from models import PieceCreate, NodeCreate, SubNode, Log, NODE_KEYS, QueryFilter, Filter
+from models import PieceCreate, NodeCreate, SubNode, Log, QueryFilter, Filter
 from typing import Any
 import os
 
@@ -46,7 +46,7 @@ def parse_subnodes(subnodes: list[SubNode], main_node_key: str):
     [f"""WITH DISTINCT {main_node_key}
         optional MATCH ({main_node_key}) -[relation :{n.relation_label}]- ()
         DELETE relation 
-        MERGE (k:{n.node_label} {{id: \"{n.node_id}\"}}) 
+        MERGE (k:{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) 
         WITH DISTINCT {main_node_key}, k
         SET k += {{{pydict_to_neo(n.properties)}}}
         CREATE ({main_node_key}) -[:{n.relation_label}]-> (k)""" for n in subnodes])
@@ -105,38 +105,56 @@ def get_nodes_paginated(labels: str, skip: int, limit: int): #TODO: verify label
     return result
 
 PIEZAS_RELATED_NODES = ["pais", "localidad", "exposicion", "cultura", "imagen"]
+MATCH_RELATED_NODES = "\n".join(f"OPTIONAL MATCH (pieza) --> ({label}:{label})" for label in PIEZAS_RELATED_NODES)
+RETURN_RELATED_NODES = ",".join(PIEZAS_RELATED_NODES)
 
 def get_pieces_info_paginated(skip: int, limit: int):
     query= f"""
     MATCH (pieza: pieza)
-    {"\n".join(f"OPTIONAL MATCH (pieza) --> ({label}:{label})" for label in PIEZAS_RELATED_NODES)}
-    RETURN elementid(pieza) as id, pieza, pais, localidad, cultura, exposicion, imagen
+    {MATCH_RELATED_NODES}
+    RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}
     SKIP $skip
     {f"LIMIT $limit" if limit>0 else ""}"""
     result = run_query(query, skip=skip, limit=limit)
     return result
 
 def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], skip: int, limit: int):
+    """ obtiene propiedades de piezas y de nodos relacionados de `limit` piezas, saltandose los primeros `skip` resultados
+    
+    se pueden filtrar los elementos por propiedades de cada nodo asociando a un ``label:str`` una lista de 
+    ``filtros:tuple[key:str, operation:str, val:Any]`` retornando finalmente solo los valores que cumplan operation(key, val) para cada filtro
+
+    Returns
+    -------
+    ``list(id:str, pieza:dict, pais:dict, localidad:dict, exposicion:dict, cultura:dict, imagen:dict``)"""
     properties_filter_clauses, query_kwargs = parse_filters(query_filters)
-    match_nodes_statement = f"MATCH (pieza: pieza) {where_clause_from_label(properties_filter_clauses)}"
+    match_nodes_statement = f"MATCH (pieza: pieza) {where_clause_from_label(properties_filter_clauses, "pieza")}"
     for label in PIEZAS_RELATED_NODES:
         match_nodes_statement += f"OPTIONAL MATCH (pieza) --> ({label}:{label}) {where_clause_from_label(properties_filter_clauses, label)}"
     query= f"""
     {match_nodes_statement}
-    RETURN elementid(pieza) as id, pieza, pais, localidad, cultura, exposicion, imagen
+    RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}
     SKIP $skip
     {f"LIMIT $limit" if limit>0 else ""}"""
     result = run_query(query, skip=skip, limit=limit, **query_kwargs)
     return result
 
 def get_piece_components(piece_id):
-    #TODO: save piece_id as int
+    """ obtiene componentes de una pieza con sus nodos relacionados
+    Parameters
+    ----------
+    piece_id:str
+        propiedad `id` de pieza
+
+    Returns
+    -------
+    ``list(id:str, componente:node, forma:node, ubicacion:node, imagen:node)``"""
     query = f"""
     MATCH (:pieza {{id: "{piece_id}"}}) -[:compuesto_por]-> (componente:componente)
     OPTIONAL MATCH (componente) -[]-> (forma:forma)
     OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
     OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
-    RETURN  elementid(componente) as id, componente, forma, ubicacion, imagen"""
+    RETURN elementid(componente) as id, componente, forma, ubicacion, imagen"""
     result = run_query(query)
     return result
 
@@ -153,29 +171,36 @@ def filter_by_nodes_names_connected(name_array: list, tag: str, other_label: str
     return result
 
 def create_user(username: str, hashed_password: str, salt: str, role: str):
+    "crea usuario en db con `username: str, hashed_password: str, salt: str, role: str`"
     query = f"CREATE (n :user {{username: '{username}', hashed_password: '{hashed_password}', salt: '{salt}', role: '{role}'}})"
     run_query(query)
 
 def create_node(tags: list[str] | None = None, **properties):
+    # TODO: validate tags (labels)
     tags = f"".join(map(lambda x : f" :{x}", tags))
     properties_query = parse_properties(properties)
     query = f"CREATE (n{tags} {properties_query})"
     run_query(query, **properties)
 
 def get_user(username: str) -> Record | None:
+    "Retorna el primer usuario con user.username == ``username``, None si no existe"
     query = f"""MATCH (n:user {{username:"{username}"}})
     RETURN n"""
     records = run_query(query)
     return records[0]['n'] if records else None
 
 def create_update_component(piece_id: str, component_id: str | None, subnodes: list[SubNode], properties: dict[str, str], tx:Transaction =None):
+    """create component for a piece, or edits component properties and connections if component_id is provided
+    
+    connections are passed ass a list of SubNodes where you indicate a property to match, also properties
+    of connected nodes can be updated"""
     fp: dict = _get_forma_properties(properties)
     if (component_id):
-        clause = "MATCH (c :componente)<-[:compuesto_por]-(p) WHERE elementid(n) = $component_id"
+        clause = "MATCH (c :componente)<-[:compuesto_por]-(p) WHERE elementid(c) = $component_id"
     else:
         clause = "CREATE (c :componente)<-[:compuesto_por]-(p)"
     query = f"""
-            MATCH (p :pieza) WHERE elementid(p) = $piece_id
+            MATCH (p) WHERE elementid(p) = $piece_id
             {clause}
             MERGE (c) -[:tiene_forma]-> (f :forma)
             WITH *, $properties AS mainProps
@@ -187,15 +212,18 @@ def create_update_component(piece_id: str, component_id: str | None, subnodes: l
             """ + parse_subnodes(subnodes, "c") + "RETURN c"
     print(query)
     if tx:
-        return tx.run(query, piece_id=piece_id, nodeId=component_id, properties=properties, f_properties=fp)
+        return tx.run(query, piece_id=piece_id, component_id=component_id, properties=properties, f_properties=fp)
     else:
-        return run_query(query, piece_id=piece_id, nodeId=component_id, properties=properties, f_properties=fp)
+        return run_query(query, piece_id=piece_id, component_id=component_id, properties=properties, f_properties=fp)
 
-def create_update_piece(piece_id: str, components: list, subnodes: list[SubNode], properties: list[dict] ):
+def create_update_piece(piece_id: str, components: list[NodeCreate], subnodes: list[SubNode], properties: list[dict] ):
+    """
+    creates or update a piece if ``piece_id`` already exists, sets ``properties`` of piece and then creates or update each component
+
+    connections of piece and components are passed as a list of SubNodes where you indicate a property to match, also properties
+    of connected nodes can be updated
+    """
     results = []
-    for index, component in enumerate(components):
-        if not component.id:
-            component.id = f"C{piece_id}_{index}"
     with GraphDatabase.driver(uri, auth=(username, password)) as driver:
         with driver.session() as session:
             with session.begin_transaction() as tx:
@@ -204,37 +232,49 @@ def create_update_piece(piece_id: str, components: list, subnodes: list[SubNode]
                         WITH p, $properties AS mainProps
                         UNWIND mainProps as properties
                         SET p += properties
-                        """ + parse_subnodes(subnodes, "p") + "RETURN elementid(p), p"
+                        """ + parse_subnodes(subnodes, "p") + " RETURN elementid(p), p"
                 print(query)
-                results.append(tx.run(query, nodeId=piece_id, properties=properties).single())
+                result = tx.run(query, nodeId=piece_id, properties=properties).single().data()
+                piece_element_id = result['elementid(p)']
+                results.append(result)
                 for component in components:
-                    result = create_update_component(piece_id, component.id, component.connected_nodes, component.properties, tx)
-                    results.append(result.single())
+                    result = create_update_component(piece_element_id, component.id, component.connected_nodes, component.properties, tx)
+                    results.append(result.single().data())
                 tx.commit()
     return results
 
-def delete_component(tx: Transaction, component_id: str, labels_to_delete: list[str]):
+def delete_component(tx: Transaction, component_id: str):
+    """deletes componente, deletes edges and nodes that depend on componente"""
     query = """
             MATCH (c {id: $nodeId})
             OPTIONAL MATCH (c)--(f :forma)
             DETACH DELETE f, c
             """
-    return tx.run(query, nodeId=component_id, allowerLabels=labels_to_delete)
+    return tx.run(query, nodeId=component_id)
 
-def detete_piece(tx: Transaction, id: str, labels_to_delete: list[str]):
+def detete_piece(tx: Transaction, id: str):
+    """Deletes pieza, deletes edges and nodes that depend on pieza"""
     query = """
             MATCH (n {id: $nodeId})
             OPTIONAL MATCH (n)--(c: componente)
             OPTIONAL MATCH (c)--(f :forma)
             DETACH DELETE f, n, c
             """
-    return tx.run(query, nodeId=id, allowedLabels=labels_to_delete)
+    return tx.run(query, nodeId=id)
+
+def delete_user(username: str):
+    query = """
+            MATCH (n:user {username: $username})
+            DETACH DELETE n
+            """
+    return run_query(query, username=username)
 
 def create_log(log: Log):
+    """creates a log connection between"""
     query = """
-            MATCH (n :user {username: $username})
-            CREATE (l :log {endpoint: $endpoint, request_method: $request_method, request_body: $request_body}) <-[:change]- (n)
+            MATCH (user :user {username: $username}), (n) WHERE elementid(n) = $node_id
+            CREATE (n) <-[l:log {endpoint: $endpoint, request_method: $request_method, request_body: $request_body}]- (user)
             RETURN l
             """
-    result = run_query(query, username=log.username, endpoint=log.endpoint, request_method=log.request_method, request_body=log.request_body)
+    result = run_query(query, username=log.username, endpoint=log.endpoint, request_method=log.request_method, request_body=log.request_body, node_id=log.node_elementid)
     return result

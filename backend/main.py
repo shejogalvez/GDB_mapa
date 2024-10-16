@@ -17,7 +17,7 @@ app.include_router(user.router)
 
 origins = [
     "http://localhost",
-    "http://localhost:5173",
+    "http://localhost:8001",
     "http://localhost:3000",
     "http://frontend_vue:3000",
     "http://frontend_vue:8000",
@@ -36,10 +36,10 @@ UPLOAD_DIR = "uploaded_images"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
-def request_to_log(request: Request, user: UserInDB, body: BaseModel) -> Log:
+def request_to_log(request: Request, user: UserInDB, body: NodeCreate) -> Log:
     endpoint = request.url.path
     request_method = request.method
-    return Log(username=user.username, endpoint=endpoint, request_method=request_method, request_body=body.model_dump_json())
+    return Log(username=user.username, endpoint=endpoint, request_method=request_method, request_body=body.model_dump_json(), node_elementid=body.id)
 
 def upload_file(file: UploadFile, file_path: str):
     with open(file_path, "wb") as buffer:
@@ -52,8 +52,8 @@ async def root():
     return result
 
 @app.get("/pieces/", dependencies=[Depends(get_read_permission_user)])
-async def get_pieces(skip: int = 0, limit: int = 0):
-    return db.get_nodes_paginated(" :pieza", skip, limit)
+async def get_pieces(skip: int = 0, limit: int = 50):
+    return db.get_pieces_info_paginated(skip, limit)
 
 @app.get("/components/", dependencies=[Depends(get_read_permission_user)])
 async def get_piece_components(piece_id: int):
@@ -90,6 +90,7 @@ def add_piece(request: Request, node_create: Annotated[PieceCreate, Body(...)], 
     result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
     log = request_to_log(request, user, node_create)
     logdb = db.create_log(log)
+    print(logdb)
     return result
 
 @app.put("/add-component", dependencies=[Depends(get_write_permission_user)])

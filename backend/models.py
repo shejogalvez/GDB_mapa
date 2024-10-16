@@ -8,9 +8,11 @@ import json
 
 class SubNode(BaseModel):
     node_id: str
-    properties: dict[str, str | int | bool]
-    relation_label: str
-    node_label: str
+    properties: dict[str, Any]
+    relation_label: Optional[str]
+    node_label: Optional[str]
+    id_key: str = 'id'
+    method: Literal['DELETE', 'UPDATE', 'CREATE'] = 'UPDATE'
 
 class NodeCreate(BaseModel):
     id: Optional[str] = None
@@ -35,6 +37,7 @@ class Log(BaseModel):
     endpoint: str
     request_method: str
     request_body: str
+    node_elementid: str
 
 class RoleEnum(Enum):
     reader = "reader"
