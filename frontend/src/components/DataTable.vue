@@ -14,6 +14,8 @@
             <th>Pais</th>
             <th>Localidad</th>
             <th>Afiliacion Cultural</th>
+            <th>Fecha de Creacion</th>
+            <th>Conjunto</th>
             <th>Exposiciones</th>
           </tr>
         </thead>
@@ -24,6 +26,8 @@
             <td>{{ row.pais }}</td>
             <td>{{ row.localidad }}</td>
             <td>{{ row.cultura }}</td>
+            <td>{{ row.fecha_de_creacion }}</td>
+            <td>{{ row.conjunto }}</td>
             <td>{{ row.exposicion }}</td>
           </tr>
         </tbody>
@@ -54,8 +58,7 @@
     methods: {
       async fetchData() {
         try {
-          const response = await axios.get('http://localhost:8000/');
-          console.log(response)
+          const response = await axios.get('http://localhost:8000/pieces/');
           this.rows = response.data;
           this.filteredRows = this.rows; // Initialize the filtered rows
         } catch (error) {
@@ -80,10 +83,14 @@
     width: 100%;
     border-collapse: collapse;
     margin: 20px 0;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
   }
   
   th, td {
-    padding: 10px;
+    padding: 10px 30px;
+    max-width: 300px;
     border: 1px solid #ddd;
     text-align: left;
   }

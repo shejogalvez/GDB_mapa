@@ -1,15 +1,16 @@
-<script setup>
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
-import DataTable from './components/DataTable.vue';
-</script>
-
 <template>
-  <main>
-    <DataTable />
-  </main>
+  <div id="app">
+    <router-view></router-view>
+  </div>
 </template>
 
-<style scoped>
+<script>
+export default {
+  name: 'App'
+};
+</script>
 
+<style>
+/* Add any global styles here */
 </style>
+
