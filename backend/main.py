@@ -32,7 +32,7 @@ app.add_middleware(
 )
 
 # Directory where images will be stored
-UPLOAD_DIR = "uploaded_images"
+UPLOAD_DIR = os.getenv("IMPORT_PATH", "uploaded_images")
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
@@ -45,6 +45,7 @@ def upload_file(file: UploadFile, file_path: str):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+# TEST ROUTE
 @app.get("/")
 async def root():
     result = list(db.get_pieces_info_paginated(3875, 25))
@@ -81,6 +82,20 @@ def get_pieces_filtered(query_filters: dict[str, list[Filter]], skip: int = 0, l
 
 @app.put("/add-piece", dependencies=[Depends(get_write_permission_user)])
 def add_piece(request: Request, node_create: Annotated[PieceCreate, Body(...)], user: Annotated[UserInDB, Depends(get_current_user)], images: List[UploadFile] = File(...)):
+    """
+    Creates/Updates a piece node, creates connections based on ``SubNode``'s specifications and Creates/Updates Components
+    attached to this piece on the same transaction, images files are saved in `UPLOAD_DIR` and nodes created are connected 
+    to the piece node
+
+    endpoint expects paramaters encoded as multipart form 
+
+    parameters
+    ----------
+    node_create: str
+        string JSON with PieceCreate schema
+    images: list[UploadFile]
+        images that will attach to the piece node
+    """
     for file in images:
         file_path = os.path.join(UPLOAD_DIR, file.filename)
         upload_file(file, file_path)
@@ -99,6 +114,18 @@ async def add_component(request: Request,
                         node_create: Annotated[NodeCreate, Body(...)],
                         piece_id: Annotated[str, Form(...)],
                         images: List[UploadFile] = File(...)):
+    """
+    endpoint expects paramaters encoded as multipart form 
+
+    parameters
+    ----------
+    node_create: str
+        string JSON with NodeCreate schema
+    piece_id: str
+        neo4j's elementid() property of piece node
+    images: list[UploadFile]
+        images that will attach to the component node
+    """
     for file in images:
         file_path = os.path.join(UPLOAD_DIR, file.filename)
         upload_file(file, file_path)
@@ -119,28 +146,18 @@ async def delete_piece(node_id):
                 return db.detete_piece(tx, node_id, to_delete)
 
 @app.post("/upload-image/", dependencies=[Depends(get_write_permission_user)])
-async def upload_image(node_id: str = Form(...), file: UploadFile = File(...)):
+async def upload_image(files: List[UploadFile] = File(...)):
     # Save the uploaded file to the server's local file system
+    result: list[SubNode] = []
     try:
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        upload_file(file, file_path)
-
-        # After saving the file, connect the image file path to the existing node in Neo4j
-        with db.get_db_driver().session() as session:
-            query = """
-            MATCH (n {id: $node_id})
-            SET n.image = $image_path
-            RETURN n
-            """
-            result = session.run(query, node_id=node_id, image_path=file_path)
-
-            # Ensure node exists and was updated
-            updated_node = result.single()
-            if not updated_node:
-                raise HTTPException(status_code=404, detail="Node not found")
+        for file in files:
+            file_path = os.path.join(UPLOAD_DIR, file.filename)
+            upload_file(file, file_path)
+            file_properties = {"size" : file.size}
+            result.append(SubNode(node_id= file_path, properties=file_properties, relation_label="has_image", node_label="image"))
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
 
-    return {"message": f"Image uploaded and connected to node {node_id}", "file_path": file_path}
+    return result
 
