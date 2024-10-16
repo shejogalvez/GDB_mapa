@@ -118,11 +118,11 @@ async def add_user(username: Annotated[str, Form()], password: Annotated[str, Fo
     db.create_user(username, hashed_password, salt, role.value)
     return {"username": username}
 
-## TEST ROUTES, TODO: DELETE
+## TEST ROUTES
 # Open route, anyone can access
 @router.get("/user")
-async def root():
-    return {"message": "Welcome to the User System API"}
+async def root(username: str):
+    return get_user(username)
 
 # Only users with read permissions can access this route
 @router.get("/user/read-data", dependencies=[Depends(get_read_permission_user)])
