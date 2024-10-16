@@ -1,5 +1,6 @@
 CREATE CONSTRAINT pieza_pk IF NOT EXISTS FOR (n:piezas) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT componente_pk IF NOT EXISTS FOR (n:componente) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT user_pk IF NOT EXISTS FOR (n:user) REQUIRE n.username IS UNIQUE;
 CREATE CONSTRAINT pais_pk IF NOT EXISTS FOR (n:pais) REQUIRE n.name IS UNIQUE;
 CREATE CONSTRAINT localidad_pk IF NOT EXISTS FOR (n:localidad) REQUIRE n.name IS UNIQUE;
 
@@ -44,7 +45,7 @@ CREATE (a)<-[:tiene_forma]-(b);
 
 LOAD CSV WITH HEADERS FROM 'file:///ubicaciones.csv' AS row
 WITH row, SPLIT(row.labels, ',') AS labeles
-CREATE (:ubicacion {id: row.id, name: row.value, label: labeles[1]});
+CREATE (:ubicacion {id: row.id, name: row.name, label: row.label});
 
 LOAD CSV WITH HEADERS FROM 'file:///ubicacion_objetos.csv' AS row
 MATCH (a:componente {id: row.id_componente}), (b:ubicacion {id: row.id_ubicacion})
@@ -88,7 +89,3 @@ CREATE (a)-[:de_cultura ]->(b);
 LOAD CSV WITH HEADERS FROM 'file:///all.csv' AS row
 MATCH (a:pieza {id: row.numero_de_inventario}), (b:componente {id: row.component_id})
 CREATE (a)-[:compuesto_por ]->(b);
-
-//TBD
-//LOAD CSV WITH HEADERS FROM 'file:///exposiciones.csv' AS row
-//CREATE (:exposicion {id: row.exposiciones_id, name: row.exposiciones});

@@ -2,6 +2,9 @@ import pandas as pd
 import os
 import sys
 from neo4j import GraphDatabase
+from pydantic import BaseModel, Field
+from typing import Literal, Type
+from uuid import UUID, uuid4
 
 # Set up the connection details
 uri = f"bolt://{ os.getenv("NEO4J_HOSTNAME", "localhost") }:7687"  # Bolt URI of your Neo4j server
@@ -12,6 +15,7 @@ username, password = os.getenv("NEO4J_AUTH").split('/')  # Your Neo4j username
 COL_PAIS      = "pais"
 COL_LOCALIDAD = "localidad"
 COL_CULTURA   = "filiacion_cultural"
+COL_UBICACION = "ubicacion"
 COL_DEPOSITO  = "deposito"
 COL_ESTANTE   = "estante"
 COL_CAJA      = "caja_actual"
@@ -99,7 +103,7 @@ def multi(df: pd.DataFrame, column_name, prefix):
     insert_id_column_to_df(df, column_name, name_id_dict, column_id_name)
     result_df = df[[column_name, column_id_name]].drop_duplicates().dropna()
     result_df = result_df[result_df[column_name] != ""]
-    print(result_df)
+    # print(result_df)
     dataframe_to_csv(result_df, f"{column_name}.csv")
 
 def add_reference_and_create_table(df: pd.DataFrame, column_name, name_id_dict):
@@ -131,68 +135,52 @@ def main(WB_PATH):
     if (len(duplicated_components_id) > 0):
         print("Existen pares de componentes/letra repetidos, datos no se van a cargar correctamente\n", duplicated_components_id)
 
-    deposito_name_id = dict()
-    estante_name_id = dict()
-    caja_name_id = dict()
-    ubicacion_dict = dict()
-    for index, row in dataframe.iterrows():
-        deposito = row[COL_DEPOSITO]
-        if not pd.isna(deposito) and deposito not in deposito_name_id:
-            d_id = f"D{len(deposito_name_id) + 1}"
-            ubicacion_dict[d_id] = set()
-            deposito_name_id[deposito] = d_id
+    
+    # Estructura recursiva para ubicaciones
+    class Ubicacion(BaseModel):
+        label: str
+        name: str
+        id: UUID = Field(default_factory=uuid4)
+        children: dict[str, 'Ubicacion'] = {}
 
-        estante = row[COL_ESTANTE]
-        if not pd.isna(estante):
-            if estante not in estante_name_id:
-                e_id = f"E{len(estante_name_id) + 1}"
-                ubicacion_dict[e_id] = set()
-                estante_name_id[estante] = e_id
-            if deposito in deposito_name_id:
-                ubicacion_dict[deposito_name_id[deposito]].add(estante_name_id[estante])
+    # lista principal de ubicaciones
+    ubicacion_dict: dict[str, Ubicacion] = dict()
+    
+    # lista de columnas que hacen referencia a ubicaciones, ordenadas de más general a más particular
+    nombres_columnas_ubicacion = [COL_UBICACION, COL_DEPOSITO, COL_ESTANTE, COL_CAJA]
 
-        caja = row[COL_CAJA]
-        if not pd.isna(caja):
-            if caja not in caja_name_id:
-                c_id = f"B{len(caja_name_id) + 1}"
-                caja_name_id[caja] = c_id
-            if estante in estante_name_id:
-                ubicacion_dict[estante_name_id[estante]].add(caja_name_id[caja])
-            elif deposito in deposito_name_id:
-                ubicacion_dict[deposito_name_id[deposito]].add(caja_name_id[caja])
-    ubicacion_df = pd.concat([
-        pd.DataFrame(list(deposito_name_id.items()), columns=['value', 'id']).assign(labels='ubicacion,deposito'),
-        pd.DataFrame(list(estante_name_id.items()), columns=['value', 'id']).assign(labels='ubicacion,estante'),
-        pd.DataFrame(list(caja_name_id.items()), columns=['value', 'id']).assign(labels='ubicacion,caja')
-    ])
-    dataframe_to_csv(ubicacion_df, 'ubicaciones.csv')
-    # dataframe_to_csv(pd.DataFrame(list(deposito_name_id.items()), columns=['id', 'value']), "depositos.csv")
-    # dataframe_to_csv(pd.DataFrame(list(estante_name_id.items()), columns=['id', 'value']) , "estantes.csv")
-    # dataframe_to_csv(pd.DataFrame(list(caja_name_id.items()), columns=['id', 'value'])    , "cajas.csv")
-
-    # parse relations between ubicacion nodes
-    contenedor_list = []
-    for contenedor, contenido in ubicacion_dict.items():
-        for elemento in contenido: 
-            contenedor_list.append((contenedor, elemento))
-    dataframe_to_csv(pd.DataFrame(list(contenedor_list), columns=['id_contenedor', 'id_contenido']), "ubicaciones_rel.csv")
-
-    # parse relations between ubicacion and components
+    # lista donde se guardan conexiones entre ubicacion y componentes
     componenteId_ubicacion = []
-    for index, line in dataframe.iterrows():
-        # obtain id
-        id = get_row_component_id(line)
-        # obtain leaf node from ubicacion
-        if not pd.isna(line[COL_CAJA]):
-            ubicacion = caja_name_id[line[COL_CAJA]]
-        elif not pd.isna(line[COL_ESTANTE]):
-            ubicacion = estante_name_id[line[COL_ESTANTE]]
-        elif not pd.isna(line[COL_DEPOSITO]):
-            ubicacion = deposito_name_id[line[COL_DEPOSITO]]
-        else:
-            continue
-        componenteId_ubicacion.append((id, ubicacion))
-    dataframe_to_csv(pd.DataFrame(list(componenteId_ubicacion), columns=['id_componente', 'id_ubicacion']), "ubicacion_objetos.csv")
+    # 
+    for index, row in dataframe.iterrows():
+        # se inicia desde el nodo base*
+        current_node = ubicacion_dict
+        last_ubicacion: Ubicacion = None
+        for col_name in nombres_columnas_ubicacion:
+            col_val = row[col_name]
+            if pd.isna(col_val): continue
+            if col_val not in current_node:
+                last_ubicacion = Ubicacion(label=col_name, name=str(col_val))
+                current_node[last_ubicacion.name] = last_ubicacion
+            else:
+                last_ubicacion = current_node[col_val]
+            current_node = last_ubicacion.children
+        if last_ubicacion:
+            componenteId_ubicacion.append({'id_componente': row['component_id'], 'id_ubicacion': last_ubicacion.id})
+
+    ubicacion_df_list = []
+    ubicacion_connection_list = []
+    def recursive_parse_tree(ubicacion_dict: dict[str, Ubicacion], parent: Ubicacion =None) -> None:
+        for key, node in ubicacion_dict.items():
+            ubicacion_df_list.append({"name": key, "label": node.label, "id": node.id})
+            if parent:
+                ubicacion_connection_list.append({'id_contenedor': parent.id, 'id_contenido': node.id})
+            recursive_parse_tree(node.children, node)
+    recursive_parse_tree(ubicacion_dict)
+
+    dataframe_to_csv(pd.DataFrame(ubicacion_df_list), "ubicaciones.csv")
+    dataframe_to_csv(pd.DataFrame(ubicacion_connection_list), "ubicaciones_rel.csv")
+    dataframe_to_csv(pd.DataFrame(componenteId_ubicacion), "ubicacion_objetos.csv")
 
 
     # Detrminar forma de cada pieza y linkear
@@ -209,9 +197,6 @@ def main(WB_PATH):
         alto =     ATRIBUTOS_FORMAS[0]
         diametro = ATRIBUTOS_FORMAS[3]
         if not pd.isna(row[diametro]):
-            d_id = f"D{len(deposito_name_id) + 1}"
-            ubicacion_dict[d_id] = set()
-            deposito_name_id[deposito] = d_id
             if not pd.isna(row[alto]):
                 forma = "cilindro"
             else:
@@ -254,7 +239,8 @@ def main(WB_PATH):
         queries = file.read().split(";\n")
         with GraphDatabase.driver(uri, auth=(username, password)) as driver:
             for query in queries:
-                    driver.execute_query(query, database_="neo4j")
+                    _, summary, _ = driver.execute_query(query, database_="neo4j")
+                    print(f"{summary.query} completed in {summary.result_available_after} ms")
 
     print("data imported to neo4j")
 
