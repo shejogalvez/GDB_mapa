@@ -80,10 +80,10 @@ def where_clause_from_label(query_expressions: dict[str, str], label: str) -> st
 
 ## DB QUERIES ##
 
-def get_all_nodes_property_filter(tag: str | None = None, properties_filter: dict[str, list[Filter]] = None, limit: int = 100, skip:int=0):
-    properties_filter_clause, query_kwargs = parse_filters(properties_filter)
-    query = f"MATCH (pieza {f":{tag}" if tag else ""}) {properties_filter_clause[tag]} RETURN pieza SKIP $skip LIMIT $limit" 
-    print(query, query_kwargs)
+def get_all_nodes_property_filter(tag: str | None = None, properties_filter: list[Filter] = None, limit: int = 100, skip:int=0):
+    properties_filter_clause, query_kwargs = parse_filters({"n": properties_filter})
+    query = f"MATCH (n {f":{tag}" if tag else ""}) {properties_filter_clause["n"]} RETURN elementid(n) as id, properties(n) as props SKIP $skip LIMIT $limit" 
+    # print(query, query_kwargs)
     result = run_query(query, limit=limit, skip=skip, **query_kwargs)
     return result
 
@@ -102,6 +102,14 @@ def get_nodes_paginated(labels: str, skip: int, limit: int): #TODO: verify label
             SKIP $skip
             LIMIT $limit"""
     result = run_query(query, skip=skip, limit=max(limit, 0))
+    return result
+
+def get_nodes_as_tree(labels: list[str], relation_label: str, root_val: Any = "root"):
+    query = f"""MATCH p=(n:{" :".join(labels)} {{name: $root}})-[:{relation_label}*]->(m)
+        WITH COLLECT(p) AS ps
+        CALL apoc.paths.toJsonTree(ps) yield value
+        RETURN value;"""
+    result = run_query(query, root=root_val)
     return result
 
 PIEZAS_RELATED_NODES = ["pais", "localidad", "exposicion", "cultura", "imagen"]

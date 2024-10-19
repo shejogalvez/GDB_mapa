@@ -66,6 +66,14 @@ async def root():
     print(result[0])
     return result
 
+@app.get("/nodes", dependencies=[Depends(get_read_permission_user)])
+async def get_nodes(labels: Annotated[list[str], Query()]):
+    return db.get_nodes_paginated(labels=labels, skip=0, limit=9999)
+
+@app.get("/nodes/tree", dependencies=[Depends(get_read_permission_user)])
+async def get_nodes_tree(labels: Annotated[list[str], Query()], rel_label: Annotated[str, Query()]):
+    return db.get_nodes_as_tree(labels=labels, relation_label=rel_label)
+
 @app.get("/pieces/", dependencies=[Depends(get_read_permission_user)])
 async def get_pieces(skip: int = 0, limit: int = 50):
     return db.get_pieces_info_paginated(skip, limit)
@@ -86,7 +94,7 @@ async def get_nodes_connected_to_piece(piece_id: str):
 async def get_nodes_connected_to_component(component_id: str):
     return db.get_nodes_without_tag_connected_to_node("pieza", "componente", id = component_id)
 
-@app.post("/pieces/")
+@app.post("/pieces/", dependencies=[Depends(get_read_permission_user)])
 def get_pieces_filtered(query_filters: dict[str, list[Filter]], skip: int = 0, limit: int = 50):
     # tag = params["tag"]
     # property_filter = json.decoder.JSONDecoder().decode(params["property_filter"])
