@@ -1,6 +1,7 @@
 from typing import Annotated, Optional, List, Literal
 from fastapi import FastAPI, Query, Depends, Body, File, Form, UploadFile, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import shutil
 import os
 import json
@@ -9,10 +10,23 @@ from pydantic import model_validator
 
 import db
 import user
-from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user, get_current_user
-from models import NodeUpdate, PieceCreate, Log, UserInDB, BaseModel, NodeCreate, SubNode, Operation, QueryFilter, Filter
+from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user, get_current_user, add_user
+from models import NodeUpdate, PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    "create admin user from env credentials if dont exists already"
+    admin_users = db.get_all_nodes_property_filter("user", [Filter(key="role", operation= "=", val="admin")])   
+    if (not admin_users):
+        # else create admin user from .env credentials
+        username = os.getenv("ADMIN_USER", "admin")
+        password = os.getenv("ADMIN_PASSWORD", "admin")
+        await add_user(username=username, password=password, role=RoleEnum.admin)
+    else:
+        print("superuser already exists")
+    yield
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(user.router)
 
 origins = [
