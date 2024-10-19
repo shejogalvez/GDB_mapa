@@ -144,7 +144,7 @@ def main(WB_PATH):
         children: dict[str, 'Ubicacion'] = {}
 
     # lista principal de ubicaciones
-    ubicacion_dict: dict[str, Ubicacion] = dict()
+    ubicacion_root: Ubicacion = Ubicacion(name="root", label="")
     
     # lista de columnas que hacen referencia a ubicaciones, ordenadas de más general a más particular
     nombres_columnas_ubicacion = [COL_UBICACION, COL_DEPOSITO, COL_ESTANTE, COL_CAJA]
@@ -154,29 +154,34 @@ def main(WB_PATH):
     # 
     for index, row in dataframe.iterrows():
         # se inicia desde el nodo base*
-        current_node = ubicacion_dict
-        last_ubicacion: Ubicacion = None
+        current_node = ubicacion_root
+        new_ubicacion: Ubicacion = None
+        # itera columnas que representan ubicaciones
         for col_name in nombres_columnas_ubicacion:
             col_val = row[col_name]
             if pd.isna(col_val): continue
-            if col_val not in current_node:
-                last_ubicacion = Ubicacion(label=col_name, name=str(col_val))
-                current_node[last_ubicacion.name] = last_ubicacion
+            print(f"{col_name}{index}: {col_val}")
+            if col_val not in current_node.children:
+                new_ubicacion = Ubicacion(label=col_name, name=str(col_val))
+                current_node.children[new_ubicacion.name] = new_ubicacion
             else:
-                last_ubicacion = current_node[col_val]
-            current_node = last_ubicacion.children
-        if last_ubicacion:
-            componenteId_ubicacion.append({'id_componente': row['component_id'], 'id_ubicacion': last_ubicacion.id})
+                new_ubicacion = current_node.children[col_val]
+            current_node = new_ubicacion
+        # componente se conecta a la ultima ubicación sobre la que se pasó/creó en el arbol 
+        if new_ubicacion:
+            print(new_ubicacion)
+            componenteId_ubicacion.append({'id_componente': row['component_id'], 'id_ubicacion': new_ubicacion.id})
 
     ubicacion_df_list = []
     ubicacion_connection_list = []
-    def recursive_parse_tree(ubicacion_dict: dict[str, Ubicacion], parent: Ubicacion =None) -> None:
-        for key, node in ubicacion_dict.items():
-            ubicacion_df_list.append({"name": key, "label": node.label, "id": node.id})
-            if parent:
-                ubicacion_connection_list.append({'id_contenedor': parent.id, 'id_contenido': node.id})
-            recursive_parse_tree(node.children, node)
-    recursive_parse_tree(ubicacion_dict)
+    def recursive_parse_tree(parent: Ubicacion) -> None:
+        # se añade a lista para crear nodo ubicacion
+        ubicacion_df_list.append({"name": parent.name, "label": parent.label, "id": parent.id})
+        for key, node in parent.children.items():
+            # se añade a lista para conectar {node} con {parent}
+            ubicacion_connection_list.append({'id_contenedor': parent.id, 'id_contenido': node.id})
+            recursive_parse_tree(node)
+    recursive_parse_tree(ubicacion_root)
 
     dataframe_to_csv(pd.DataFrame(ubicacion_df_list), "ubicaciones.csv")
     dataframe_to_csv(pd.DataFrame(ubicacion_connection_list), "ubicaciones_rel.csv")
@@ -250,4 +255,4 @@ if __name__ == "__main__":
     if len(args) < 2:
         print("ingresar ruta de archivo excel a cargar")
         exit(-1)
-    main(args[1])
+    main(WB_PATH=args[1])

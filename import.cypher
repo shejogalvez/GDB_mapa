@@ -44,7 +44,6 @@ MATCH (b:componente {id: row.id_componente})
 CREATE (a)<-[:tiene_forma]-(b);
 
 LOAD CSV WITH HEADERS FROM 'file:///ubicaciones.csv' AS row
-WITH row, SPLIT(row.labels, ',') AS labeles
 CREATE (:ubicacion {id: row.id, name: row.name, label: row.label});
 
 LOAD CSV WITH HEADERS FROM 'file:///ubicacion_objetos.csv' AS row
@@ -70,22 +69,16 @@ SET n.numero_de_registro_anterior = row.`numero_de registro_anterior`,
     n.procedencia =                 row.tipo,
     n.donante =                     row.procedencia,
     n.fecha_ingreso =               CASE WHEN n.fecha_ingreso IS NULL THEN NULL ELSE date(datetime({epochmillis: apoc.date.parse(row.fecha_ingreso, "ms", "dd/MM/yyyy")})) END,
-    n.fecha_ingreso_text =          row.fecha_ingreso;
-
-
-LOAD CSV WITH HEADERS FROM 'file:///piezas.csv' AS row
-MATCH (a:pieza {id: row.numero_de_inventario}), (b:pais {name: row.pais})
-CREATE (a)-[:de_pais ]->(b);
-
-LOAD CSV WITH HEADERS FROM 'file:///piezas.csv' AS row
-MATCH (a:pieza {id: row.numero_de_inventario}), (b:localidad {name: row.localidad})
-CREATE (a)-[:de_localidad ]->(b);
-
-LOAD CSV WITH HEADERS FROM 'file:///piezas.csv' AS row
-MATCH (a:pieza {id: row.numero_de_inventario}), (b:cultura {name: row.filiacion_cultural})
-CREATE (a)-[:de_cultura ]->(b);
-    
-
-LOAD CSV WITH HEADERS FROM 'file:///all.csv' AS row
-MATCH (a:pieza {id: row.numero_de_inventario}), (b:componente {id: row.component_id})
-CREATE (a)-[:compuesto_por ]->(b);
+    n.fecha_ingreso_text =          row.fecha_ingreso
+WITH n, row
+MATCH (b:pais {name: row.pais})
+CREATE (n)-[:de_pais ]->(b)
+WITH n, row
+MATCH (b:localidad {name: row.localidad})
+CREATE (n)-[:de_localidad ]->(b)
+WITH n, row
+MATCH (b:cultura {name: row.filiacion_cultural})
+CREATE (n)-[:de_cultura ]->(b)
+WITH n, row
+MATCH (b:componente {id: row.component_id})
+CREATE (n)-[:compuesto_por ]->(b);
