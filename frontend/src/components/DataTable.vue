@@ -1,6 +1,9 @@
 <template>
     <div>
       <h1>Piezas</h1>
+
+      <button @click="openModal" class="modern-button">crear pieza</button>
+      <FormModal :isVisible="showModal" @close="closeModal" />
       
       <!-- Filter Input -->
       <input v-model="filterText" placeholder="Filter by id..." @input="filterRows" />
@@ -45,18 +48,24 @@
   
   <script>
   import axios from 'axios';
+  import FormModal from './FormModal.vue';
   
   export default {
+    components: {
+      FormModal
+    },
     data() {
       return {
         rows: [],
         filteredRows: [],
         selectedRows: [],
-        filterText: ""
+        filterText: "",
+        showModal: true,
       };
     },
     methods: {
       async fetchData() {
+        console.log("auth", axios.defaults.headers.common['Authorization']);
         try {
           const response = await axios.get('http://localhost:8000/pieces/');
           this.rows = response.data;
@@ -70,14 +79,21 @@
         const filter = this.filterText.toLowerCase();
         this.filteredRows = this.rows.filter(row => row.id.includes(filter));
         console.log(this.selectedRows)
+      },
+      openModal() {
+        this.showModal = true;  // Open the modal
+      },
+      closeModal() {
+        this.showModal = false;  // Close the modal
       }
+
     },
     mounted() {
       this.fetchData(); // Fetch data on component mount
     }
   };
   </script>
-  
+
   <style scoped>
   table {
     width: 100%;
@@ -108,5 +124,41 @@
   input[type="checkbox"] {
     margin-right: 10px;
   }
+  
+  .main-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: #f9f9f9;
+    font-family: 'Arial', sans-serif;
+  }
+  
+  h1 {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #333;
+  }
+  
+  .modern-button {
+    padding: 12px 24px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease, transform 0.2s ease;
+  }
+  
+  .modern-button:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
+  }
+
   </style>
   

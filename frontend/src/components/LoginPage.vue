@@ -19,7 +19,7 @@
         <input v-model="password" type="password" id="password" placeholder="Enter password" required />
       </div>
 
-      <button type="submit">Login</button>
+      <button type="submit" class="submit-button">Login</button>
     </form>
   </div>
 </template>
@@ -77,38 +77,63 @@ export default {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
+.login-container {
+  text-align: center;
+}
+
+h1 {
+  font-size: 2rem;
+  color: #333;
+  margin-bottom: 20px;
+}
+
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 label {
   display: block;
-  margin-bottom: 5px;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #444;
 }
 
 input[type="text"], input[type="password"] {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  width: 90%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  background-color: #f7f7f7;
 }
 
-button {
+input[type="text"]:focus, input[type="password"]:focus {
+  border-color: #007bff;
+  background-color: #fff;
+}
+
+.submit-button {
   width: 100%;
-  padding: 10px;
-  background-color: #28a745;
+  padding: 12px;
+  background-color: #007bff;
   color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.2s ease;
 }
 
-button:hover {
-  background-color: #218838;
+.submit-button:hover {
+  background-color: #0056b3;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
 }
 
 .error-message {
   color: red;
-  margin-bottom: 15px;
+  font-size: 0.9rem;
+  margin-bottom: 20px;
 }
 </style>
