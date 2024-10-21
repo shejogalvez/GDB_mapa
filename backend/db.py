@@ -105,9 +105,8 @@ def get_nodes_without_tag_connected_to_node(exclude_tag: str, node_tag = "", **m
 def get_nodes_paginated(labels: str, skip: int, limit: int): #TODO: verify labels
     query = f"""MATCH (i {labels})
             RETURN i
-            SKIP $skip
-            LIMIT $limit"""
-    result = run_query(query, skip=skip, limit=max(limit, 0))
+            {skip_limit_clause(limit)}"""
+    result = run_query(query, skip=skip, limit=limit)
     return result
 
 def get_nodes_as_tree(labels: list[str], relation_label: str, root_val: Any = "root"):
@@ -123,14 +122,13 @@ MATCH_RELATED_NODES = "\n".join(f"OPTIONAL MATCH (pieza) --> ({label}:{label})" 
 RETURN_RELATED_NODES = ",".join(PIEZAS_RELATED_NODES)
 
 def get_pieces_info_paginated(skip: int, limit: int):
-    query= f"""
-    MATCH (pieza: pieza)
-    {MATCH_RELATED_NODES}
-    RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}
-    SKIP $skip
-    {f"LIMIT $limit" if limit>0 else ""}"""
+    pre_query= f"MATCH (pieza: pieza) {MATCH_RELATED_NODES}"
+    post_query = f"RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES} {skip_limit_clause(limit)}"
+    query = pre_query + post_query
     result = run_query(query, skip=skip, limit=limit)
-    return result
+    query_count = pre_query + "RETURN count(*) as count"
+    count = run_query(query_count, skip=skip, limit=limit)[0]
+    return result, count
 
 def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], skip: int, limit: int):
     """ obtiene propiedades de piezas y de nodos relacionados de `limit` piezas, saltandose los primeros `skip` resultados
@@ -148,10 +146,11 @@ def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], s
     query= f"""
     {match_nodes_statement}
     RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}
-    SKIP $skip
-    {f"LIMIT $limit" if limit>0 else ""}"""
+    {skip_limit_clause(limit)}"""
     result = run_query(query, skip=skip, limit=limit, **query_kwargs)
-    return result
+    query_count = match_nodes_statement + "RETURN count(*) as count"
+    count = run_query(query_count, skip=skip, limit=limit, **query_kwargs)[0]
+    return result, count
 
 def get_piece_components(piece_id):
     """ obtiene componentes de una pieza con sus nodos relacionados
@@ -165,7 +164,8 @@ def get_piece_components(piece_id):
     ``list(id:str, componente:node, forma:node, ubicacion:node, imagen:node)``"""
     query = f"""
     MATCH (:pieza {{id: "{piece_id}"}}) -[:compuesto_por]-> (componente:componente)
-    OPTIONAL MATCH (componente) -[]-> (forma:forma)
+    OPTIONAL MATCH (compone    SKIP $skip
+nte) -[]-> (forma:forma)
     OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
     OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
     RETURN elementid(componente) as id, componente, forma, ubicacion, imagen"""
