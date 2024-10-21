@@ -6,11 +6,14 @@ from dataclasses import dataclass
 
 import json
 
+#NodeLabel: labels de nodos válidos para hacer match al momento de hacer queries
+NodeLabel = Literal["pieza", "pais", "localidad", "exposicion", "cultura", "imagen", "componente", "forma", "ubicacion"]
+
 class SubNode(BaseModel):
     node_id: str
     properties: dict[str, Any]
     relation_label: Optional[str]
-    node_label: Optional[str]
+    node_label: Optional[NodeLabel]
     id_key: str = 'id'
     method: Literal['DELETE', 'UPDATE', 'CREATE'] = 'UPDATE'
 
@@ -54,7 +57,8 @@ class UserInDB(User):
     hashed_password: str
     salt: Optional[str] = "" #TODO: not optional
 
-Operation = Literal['=', '>=', '<', 'contains']
+# Operation: keywords que representan operacionaes para comparar campos al filtrar
+Operation = Literal['=', '>=', '<', '<=', '>', 'contains']
 
 class Filter(BaseModel):
     key: str 

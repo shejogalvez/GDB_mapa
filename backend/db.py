@@ -57,6 +57,10 @@ def parse_operation(operation_str: str, key: str) -> str:
             return f"= ${key}"
         case ">=":
             return f">= ${key}"
+        case ">":
+            return f"> ${key}"
+        case "<=":
+            return f"<= ${key}"
         case "<":
             return f"< ${key}"
         case "contains":
@@ -173,7 +177,7 @@ nte) -[]-> (forma:forma)
     return result
 
 def filter_by_nodes_names_connected(name_array: list, tag: str, other_label: str = "", skip: int = 0, limit: int = 0):
-    if other_label != "":
+    if other_label:
         other_label = f" :{other_label}" 
     query = f"""MATCH (n:{tag})-[r]-(connectedNode{other_label})
             WHERE connectedNode.name IN {name_array}

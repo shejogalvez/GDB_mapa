@@ -11,7 +11,7 @@ from pydantic import model_validator
 import db
 import user
 from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user, get_current_user, add_user
-from models import NodeUpdate, PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum
+from models import NodeUpdate, PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum, NodeLabel
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,11 +67,11 @@ async def root():
     return result
 
 @app.get("/nodes", dependencies=[Depends(get_read_permission_user)])
-async def get_nodes(labels: Annotated[list[str], Query()]):
+async def get_nodes(labels: Annotated[list[NodeLabel], Query()]):
     return db.get_nodes_paginated(labels=labels, skip=0, limit=9999)
 
 @app.get("/nodes/tree", dependencies=[Depends(get_read_permission_user)])
-async def get_nodes_tree(labels: Annotated[list[str], Query()], rel_label: Annotated[str, Query()]):
+async def get_nodes_tree(labels: Annotated[list[NodeLabel], Query()], rel_label: Annotated[str, Query()]):
     return db.get_nodes_as_tree(labels=labels, relation_label=rel_label)
 
 @app.get("/pieces/", dependencies=[Depends(get_read_permission_user)])
@@ -83,7 +83,7 @@ async def get_piece_components(piece_id: int):
     return db.get_piece_components(piece_id)
 
 @app.get("/pieces-by-nodes/", dependencies=[Depends(get_read_permission_user)])
-async def get_piece_by_nodes(node_names: Annotated[list[str], Query()], nodes_label: str = ""):
+async def get_piece_by_nodes(node_names: Annotated[list[str], Query()], nodes_label: Optional[NodeLabel] = None):
     return db.filter_by_nodes_names_connected(node_names, "pieza", nodes_label)
 
 @app.get("/piece-connected-nodes/", dependencies=[Depends(get_read_permission_user)])
@@ -95,11 +95,10 @@ async def get_nodes_connected_to_component(component_id: str):
     return db.get_nodes_without_tag_connected_to_node("pieza", "componente", id = component_id)
 
 @app.post("/pieces/", dependencies=[Depends(get_read_permission_user)])
-def get_pieces_filtered(query_filters: dict[str, list[Filter]], skip: int = 0, limit: int = 50):
+def get_pieces_filtered(query_filters: dict[NodeLabel, list[Filter]], skip: int = 0, limit: int = 50):
     # tag = params["tag"]
     # property_filter = json.decoder.JSONDecoder().decode(params["property_filter"])
     return db.get_pieces_info_paginated_filtered(query_filters, skip, limit)
-    return params
 
 
 @app.put("/add-piece", dependencies=[Depends(get_write_permission_user)])
