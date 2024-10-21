@@ -13,7 +13,16 @@
         <thead>
           <tr>
             <th>Select</th>
-            <th>ID</th>
+            <th>Numero de Inventario</th>
+            <th>Número de registro anterior</th>
+            <th>Coleccion</th>
+            <th>SURDOC</th>
+            <th>Clasificacion</th>
+            <th>Conjunto</th>
+            <th>Autor</th>
+            <th>Fecha de Creacion</th>
+            <th>Contexto Historico</th>
+            <th>Notas de Investigacion</th>
             <th>Pais</th>
             <th>Localidad</th>
             <th>Afiliacion Cultural</th>
@@ -26,9 +35,18 @@
           <tr v-for="row in filteredRows" :key="row.pieza.id">
             <td><input type="checkbox" v-model="selectedRows" :value="row" /></td>
             <td>{{ row.pieza.id }}</td>
-            <td>{{ row.pais }}</td>
-            <td>{{ row.localidad }}</td>
-            <td>{{ row.cultura }}</td>
+            <td>{{ row.pieza["numero_de registro_anterior"] }}</td>
+            <td>{{ row.pieza.coleccion }}</td>
+            <td>{{ row.pieza.SURDOC }}</td>
+            <td>{{ row.pieza.clasificacion }}</td>
+            <td>{{ row.pieza.conjunto }}</td>
+            <td>{{ row.pieza.autor }}</td>
+            <td>{{ row.pieza.fecha_de_creacion }}</td>
+            <td>{{ row.pieza.contexto_historico }}</td>
+            <td>{{ row.pieza.notas_investigacion }}</td>
+            <td>{{ row.pais?.name }}</td>
+            <td>{{ row.localidad?.name }}</td>
+            <td>{{ row.cultura?.name }}</td>
             <td>{{ row.fecha_de_creacion }}</td>
             <td>{{ row.conjunto }}</td>
             <td>{{ row.exposicion }}</td>
@@ -43,6 +61,25 @@
           <li v-for="row in selectedRows" :key="row.pieza.id">{{ row.pieza.id }}</li>
         </ul>
       </div>
+
+      <!-- page select -->
+      <div class="pagination-controls">
+        
+      <button :disabled="currentPage === 0" @click="changePage(0)">First</button>
+      <button :disabled="currentPage === 0" @click="changePage(this.currentPage - 1)">Previous</button>
+        
+      <button
+        v-for="page in pagesArray"
+        :key="page"
+        @click="changePage(page)"
+        :class="{'active': currentPage === page}"
+      >
+        {{ page+1 }}
+      </button>
+    
+      <button :disabled="currentPage === totalPages" @click="changePage(this.currentPage + 1)">Next</button>
+      <button :disabled="currentPage === totalPages" @click="changePage(this.totalPages)">Last</button>
+    </div>
     </div>
   </template>
   
@@ -60,25 +97,64 @@
         filteredRows: [],
         selectedRows: [],
         filterText: "",
-        showModal: true,
+        showModal: false,
+        currentPage: 0,
+        limitResults: 75,
+        totalPages: 50
       };
     },
     methods: {
       async fetchData() {
-        console.log("auth", axios.defaults.headers.common['Authorization']);
         try {
-          const response = await axios.get('http://localhost:8000/pieces/');
-          this.rows = response.data;
+          const response = await axios.get('http://localhost:8000/pieces/', {params: {
+            skip: this.currentPage*this.limitResults,
+            limit: this.limitResults
+          }});
+          this.rows = response.data[0]; 
+          this.totalPages = Math.floor(response.data[1]['count'] / this.limitResults)
+          //console.log(this.totalPages)
           this.filteredRows = this.rows; // Initialize the filtered rows
         } catch (error) {
           console.error('Error fetching data:', error);
         }
       },
-      filterRows() {
+      async changePage(toPage) {
+        this.currentPage = toPage;
+        if (this.filterText) {
+          await this.filterRows();
+        }
+        else {
+          await this.fetchData();
+        }
+      },
+      async filterRows() {
         // Filter rows based on filterText input
         const filter = this.filterText.toLowerCase();
-        this.filteredRows = this.rows.filter(row => row.id.includes(filter));
-        console.log(this.selectedRows)
+        try {
+          const response = await axios.post('http://localhost:8000/pieces/', {
+            "pieza": [
+              {
+                "key": "id",
+                "operation": "contains",
+                "val": filter
+              }
+            ]
+          }, 
+          {
+            params: {
+              skip: this.currentPage*this.limitResults,
+              limit: this.limitResults
+            }
+          });
+          this.filteredRows = response.data[0]
+          this.totalPages = Math.floor(response.data[1]['count'] / this.limitResults)
+          console.log(this.totalPages)
+        }
+        catch (e){
+          console.error(e)
+        }
+        
+        //this.filteredRows = this.rows.filter(row => row.pieza.id.includes(filter));
       },
       openModal() {
         this.showModal = true;  // Open the modal
@@ -88,8 +164,22 @@
       }
 
     },
+    computed: {
+      pagesArray() {
+        let newArr = [];
+        for (let i = Math.max(0, this.currentPage - 5); i <= Math.min(this.currentPage + 5, this.totalPages); i++) {
+          newArr.push(i);
+        }
+        return newArr;
+      }
+    }, 
     mounted() {
       this.fetchData(); // Fetch data on component mount
+    },
+    watch: {
+      $route(to, from) {
+        this.currentPage = this.$route.params.page
+      }
     }
   };
   </script>
@@ -109,6 +199,8 @@
     max-width: 300px;
     border: 1px solid #ddd;
     text-align: left;
+    text-overflow: ellipsis;
+    overflow: hidden;
   }
   
   th {
@@ -160,5 +252,34 @@
     transform: scale(1.05);
   }
 
+  .pagination-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+button {
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+button.active {
+  background-color: #0056b3;
+  font-weight: bold;
+}
   </style>
   
