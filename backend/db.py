@@ -75,8 +75,14 @@ def parse_filters(args: dict[str, list[Filter]]) -> tuple[dict[str, str], dict[s
         query_kwargs = dict([(f"{label}_{x.key}", x.val) for x in filters])
     return query_expressions, query_kwargs
 
+def match_clause_from_label(query_expressions: dict[str, str], label: str) -> str:
+    return f"MATCH (pieza) --> ({label}:{label}) {query_expressions[label]}" if label in query_expressions else f"OPTIONAL MATCH (pieza) --> ({label}:{label})"
+
 def where_clause_from_label(query_expressions: dict[str, str], label: str) -> str:
     return query_expressions[label] if label in query_expressions else ""
+
+def skip_limit_clause(limit: int) -> str:
+    return "SKIP $skip " + "LIMIT $limit" if limit>0 else ""
 
 ## DB QUERIES ##
 
@@ -138,7 +144,7 @@ def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], s
     properties_filter_clauses, query_kwargs = parse_filters(query_filters)
     match_nodes_statement = f"MATCH (pieza: pieza) {where_clause_from_label(properties_filter_clauses, "pieza")}"
     for label in PIEZAS_RELATED_NODES:
-        match_nodes_statement += f"OPTIONAL MATCH (pieza) --> ({label}:{label}) {where_clause_from_label(properties_filter_clauses, label)}"
+        match_nodes_statement += f"{match_clause_from_label(properties_filter_clauses, label)}"
     query= f"""
     {match_nodes_statement}
     RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}
