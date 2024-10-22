@@ -1,25 +1,35 @@
-import { createMemoryHistory, createRouter } from 'vue-router';
+import { createWebHistory, createRouter } from 'vue-router';
 import axios from 'axios';
 import { jwtDecode } from "jwt-decode";
 import LoginPage from '../components/LoginPage.vue';
 import DataTable from '../components/DataTable.vue';  // Assume you have a Dashboard component
+import PieceDetails from '../components/PieceDetails.vue';  
 
 const routes = [
   { path: '/login', name: 'Login', component: LoginPage },
   {
-    path: '/dashboard',
-    name: 'Dashboard',
+    path: '/:page?',
+    name: 'DataTable',
     component: DataTable
+  },
+  {
+    path: '/details/*',
+    name: 'Details',
+    component: PieceDetails,
+    props: (route) => ({
+      ...route.params
+    })
+
   },
   { path: '/:pathMatch(.*)*', name: "nn",
     beforeEnter: (to, from, next) => {
-      next('/dashboard');  // Proceed to dashboard
+      next('/');  // Proceed to dashboard
     }
   }  // Redirect any unknown paths to main page
 ];
 
 const router = createRouter({
-    history: createMemoryHistory(),
+    history: createWebHistory(),
     routes,
 });
 

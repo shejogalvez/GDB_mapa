@@ -9,7 +9,7 @@
       <input v-model="filterText" placeholder="Filter by id..." @input="filterRows" />
   
       <!-- Data Table -->
-      <table>
+      <table :class="fixedTable">
         <thead>
           <tr>
             <th>Select</th>
@@ -27,13 +27,12 @@
             <th>Localidad</th>
             <th>Afiliacion Cultural</th>
             <th>Fecha de Creacion</th>
-            <th>Conjunto</th>
             <th>Exposiciones</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="row in filteredRows" :key="row.pieza.id">
-            <td><input type="checkbox" v-model="selectedRows" :value="row" /></td>
+            <td><button class="modern-button" @click="goToDetails(row)"> </button> </td>
             <td>{{ row.pieza.id }}</td>
             <td>{{ row.pieza["numero_de registro_anterior"] }}</td>
             <td>{{ row.pieza.coleccion }}</td>
@@ -47,8 +46,7 @@
             <td>{{ row.pais?.name }}</td>
             <td>{{ row.localidad?.name }}</td>
             <td>{{ row.cultura?.name }}</td>
-            <td>{{ row.fecha_de_creacion }}</td>
-            <td>{{ row.conjunto }}</td>
+            <td>{{ row.pieza.fecha_de_creacion }}</td>
             <td>{{ row.exposicion }}</td>
           </tr>
         </tbody>
@@ -100,10 +98,17 @@
         showModal: false,
         currentPage: 0,
         limitResults: 75,
-        totalPages: 50
+        totalPages: 50,
+        overflow_val: 'auto'
       };
     },
     methods: {
+
+      goToDetails(row) {
+        console.log(row);
+        this.$router.push({name: `Details`, params: {...row, id:row.id}});  // Navigate to the user details page
+      },
+
       async fetchData() {
         try {
           const response = await axios.get('http://localhost:8000/pieces/', {params: {
@@ -118,8 +123,9 @@
           console.error('Error fetching data:', error);
         }
       },
+
       async changePage(toPage) {
-        this.currentPage = toPage;
+        this.$router.push(`/${toPage}`)
         if (this.filterText) {
           await this.filterRows();
         }
@@ -127,6 +133,7 @@
           await this.fetchData();
         }
       },
+
       async filterRows() {
         // Filter rows based on filterText input
         const filter = this.filterText.toLowerCase();
@@ -156,9 +163,11 @@
         
         //this.filteredRows = this.rows.filter(row => row.pieza.id.includes(filter));
       },
+
       openModal() {
         this.showModal = true;  // Open the modal
       },
+
       closeModal() {
         this.showModal = false;  // Close the modal
       }
@@ -171,9 +180,14 @@
           newArr.push(i);
         }
         return newArr;
+      },
+      fixedTable() {
+        return this.showModal ? 'fixed' : '';
       }
     }, 
     mounted() {
+      //console.log(this.$route.params);
+      if (this.$route.params.page) this.currentPage = parseInt(this.$route.params.page);
       this.fetchData(); // Fetch data on component mount
     },
     watch: {
@@ -185,6 +199,11 @@
   </script>
 
   <style scoped>
+  .fixed {
+    position: fixed;
+    overflow-y: v-bind('overflow_val');
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;

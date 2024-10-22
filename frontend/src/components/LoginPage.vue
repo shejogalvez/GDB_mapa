@@ -47,12 +47,12 @@ export default {
         form.append("password", this.password);
         const response = await axios.post('http://localhost:8000/token', form);
 
-        // Handle successful login (e.g., navigate to dashboard, store token)
+        // Handle successful login (e.g., navigate to mainpage, store token)
         let token = response.data.access_token
         if (token) {
           localStorage.setItem('token', token);  // Save token in localStorage
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-          this.$router.push('/dashboard');  // Redirect to dashboard or another protected page
+          this.$router.push('/');  // Redirect to mainpage
         }
       } catch (error) {
         // Handle login failure
