@@ -79,7 +79,7 @@ async def get_pieces(skip: int = 0, limit: int = 50):
     return db.get_pieces_info_paginated(skip, limit)
 
 @app.get("/components/", dependencies=[Depends(get_read_permission_user)])
-async def get_piece_components(piece_id: int):
+async def get_piece_components(piece_id: Annotated[str, Query()]):
     return db.get_piece_components(piece_id)
 
 @app.get("/pieces-by-nodes/", dependencies=[Depends(get_read_permission_user)])
@@ -117,6 +117,7 @@ def add_piece(request: Request, node_create: Annotated[PieceCreate, Body(...)], 
     images: list[UploadFile]
         images that will attach to the piece node
     """
+    if len(node_create.components) < 1: return HTTPException(422, detail="Se espera al menos 1 componente para esta pieza")
     for file in images:
         file_path = os.path.join(UPLOAD_DIR, file.filename)
         upload_file(file, file_path)

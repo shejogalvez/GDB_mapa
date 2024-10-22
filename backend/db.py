@@ -167,13 +167,12 @@ def get_piece_components(piece_id):
     -------
     ``list(id:str, componente:node, forma:node, ubicacion:node, imagen:node)``"""
     query = f"""
-    MATCH (:pieza {{id: "{piece_id}"}}) -[:compuesto_por]-> (componente:componente)
-    OPTIONAL MATCH (compone    SKIP $skip
-nte) -[]-> (forma:forma)
+    MATCH (p) -[:compuesto_por]-> (componente:componente) WHERE elementid(p) = $piece_id
+    OPTIONAL MATCH (componente) -[]-> (forma:forma)
     OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
     OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
     RETURN elementid(componente) as id, componente, forma, ubicacion, imagen"""
-    result = run_query(query)
+    result = run_query(query, piece_id=piece_id)
     return result
 
 def filter_by_nodes_names_connected(name_array: list, tag: str, other_label: str = "", skip: int = 0, limit: int = 0):
