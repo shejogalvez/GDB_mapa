@@ -2,7 +2,18 @@
   "compilerOptions": {
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "allowJs": true,
+    "target": "es5",
+    "module": "esnext",
+    "baseUrl": "./",
+    "moduleResolution": "bundler",
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "scripthost"
+    ]
   },
   "exclude": ["node_modules", "dist"]
 }
