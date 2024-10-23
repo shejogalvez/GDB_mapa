@@ -63,7 +63,6 @@ export default {
     flex-direction: row;
     width: 100%;
     align-items: justify;
-    background-color: #ffffff;
 }
 
 .flex-box .dropdown-arrow{

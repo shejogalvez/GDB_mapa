@@ -1,7 +1,10 @@
 <template>
     <div class="custom-select" :tabindex="tabindex" @blur="open = false">
-        <div class="selected" :class="{ open: open }" @click="open = !open">
-        {{ selected.name }}
+        <div style="align-items: center;">
+          <div class="selected" :class="{ open: open }" @click="open = !open">
+          {{ selected ? selected.name : "seleccionar ubicacion" }}
+          </div>
+          <span class="close" v-if="selected" @click="() => {selected = null; open = false; $emit('input', null)}">&times;</span>
         </div>
         <div class="items" :class="{ selectHide: !open }">
             <DropdownItem
@@ -53,10 +56,6 @@ export default {
       open: false,
     };
   },
-  mounted() {
-    this.$emit("input", this.selected);
-    console.log(this.selected.name);
-  },
 };
 </script>
 
@@ -104,9 +103,25 @@ export default {
   left: 0;
   right: 0;
   z-index: 1;
+  background-color: #fff;
 }
 
 .selectHide {
   display: none;
+}
+
+.close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  position: absolute;
+  top: 0px;
+  right: 15px;
+  color: #888;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #555;
 }
 </style>
