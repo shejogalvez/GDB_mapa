@@ -68,7 +68,7 @@ async def root():
 
 @app.get("/nodes", dependencies=[Depends(get_read_permission_user)])
 async def get_nodes(labels: Annotated[list[NodeLabel], Query()]):
-    return db.get_nodes_paginated(labels=labels, skip=0, limit=9999)
+    return db.get_nodes_paginated(labels=labels, skip=0, limit=0)
 
 @app.get("/nodes/tree", dependencies=[Depends(get_read_permission_user)])
 async def get_nodes_tree(labels: Annotated[list[NodeLabel], Query()], rel_label: Annotated[str, Query()]):

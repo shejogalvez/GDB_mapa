@@ -25,6 +25,9 @@ def run_query(query: str, database_="neo4j", **kwarws) -> EagerResult:
 def parse_properties(**properties):
     return "{"+{", ".join([f"{key}:${key}" for key in properties])}+"}"
 
+def parse_labels(labels: list[str]) -> str:
+    return f":{' :'.join(labels)} " if labels else ""
+
 def _get_forma_properties(properties: dict[str, str]) -> dict[str, str]: # TODO: mover esto al backend(?)
     FORMA_KEYS = ["alto", "ancho", "profundidad", "peso"]
     forma_properties = {}
@@ -37,14 +40,15 @@ def _get_forma_properties(properties: dict[str, str]) -> dict[str, str]: # TODO:
         properties.pop(key)
     return forma_properties
 
-def pydict_to_neo(parameters: dict) -> str:
+def pydict_to_neo(parameters: dict|None) -> str:
+    if (not parameters): return ""
     return ', '.join(f'{key}: {val if type(val) is not str else f'"{val}"'}' for key, val in parameters.items())
 
 # creates query to connect each node to the main node
 def parse_subnodes(subnodes: list[SubNode], main_node_key: str):
     return "\n".join(
     [f"""WITH DISTINCT {main_node_key}
-        optional MATCH ({main_node_key}) -[relation :{n.relation_label}]- ()
+        optional MATCH ({main_node_key}) -[relation]- (:{n.node_label})
         DELETE relation 
         MERGE (k:{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) 
         WITH DISTINCT {main_node_key}, k
@@ -106,15 +110,15 @@ def get_nodes_without_tag_connected_to_node(exclude_tag: str, node_tag = "", **m
     result = run_query(query, **match_properties)
     return result
 
-def get_nodes_paginated(labels: str, skip: int, limit: int): #TODO: verify labels
-    query = f"""MATCH (i {labels})
-            RETURN i
+def get_nodes_paginated(labels: str, skip: int, limit: int):
+    query = f"""MATCH (i {parse_labels(labels)})
+            RETURN elementid(i) as id, properties(i) as properties 
             {skip_limit_clause(limit)}"""
     result = run_query(query, skip=skip, limit=limit)
     return result
 
 def get_nodes_as_tree(labels: list[str], relation_label: str, root_val: Any = "root"):
-    query = f"""MATCH p=(n:{" :".join(labels)} {{name: $root}})-[:{relation_label}*]->(m)
+    query = f"""MATCH p=(n {parse_labels(labels)} {{name: $root}})-[:{relation_label}*]->(m)
         WITH COLLECT(p) AS ps
         CALL apoc.paths.toJsonTree(ps) yield value
         RETURN value;"""

@@ -11,15 +11,15 @@ NodeLabel = Literal["pieza", "pais", "localidad", "exposicion", "cultura", "imag
 
 class SubNode(BaseModel):
     node_id: str
-    properties: dict[str, Any]
-    relation_label: Optional[str]
-    node_label: Optional[NodeLabel]
-    id_key: str = 'id'
+    properties: Optional[dict[str, Any]] = None
+    relation_label: Optional[str] = None
+    node_label: Optional[NodeLabel] = None
+    id_key: Optional[str] = None
     method: Literal['DELETE', 'UPDATE', 'CREATE'] = 'UPDATE'
 
 class NodeCreate(BaseModel):
     id: Optional[str] = None
-    properties: dict[str, str]  # Properties to update on the main node
+    properties: Optional[dict[str, Any]] = None # Properties to update on the main node
     connected_nodes: list[SubNode]  # Each connected node and its properties
     
     @model_validator(mode='before')
