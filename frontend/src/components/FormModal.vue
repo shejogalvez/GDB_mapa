@@ -56,7 +56,8 @@
                         ></v-combobox>
                         
                         <!-- Multiple Image Upload -->
-                        <v-file-input label="imágenes de pieza" @change="handleFileUpload" multiple></v-file-input>
+                        <label for="imagen"> subir imagen piezas</label>
+                        <input type="file" id="imagen" name="imagen" @change="handleComponentFileUpload(this, $event)" multiple></input>
 
                         <!-- Preview Images -->
                         <div class="image-preview">
@@ -106,8 +107,9 @@
                             </TreeDropdown>
                             
                             <!-- Multiple Image Upload -->
-                            
-                            <v-text-field type="file" label="images" @change="handleComponentFileUpload(component, i, $event)" multiple></v-text-field>
+                            <br><br>
+                            <label :for="`image${i}`"> subir imagen componente {{ i }}</label>  
+                            <input type="file" :id="`image${i}`" :name="`image${i}`" @change="handleComponentFileUpload(component, $event)" multiple></input>
 
                             <!-- Preview Images -->
                             <div class="image-preview">
@@ -119,8 +121,9 @@
                         
                         <button type="button" @click="agregarComponente">+ componente</button>
                         
-                        <!-- Submit Button -->
+                        <br><br>
                         <button type="button" @click="submitForm">Submit</button>
+                        <!-- Submit Button -->
                     </v-form>
             </div>
     
@@ -132,6 +135,7 @@
 import axios from 'axios';
 import TreeDropdown from './TreeDropdown.vue'
 import { VDateInput } from 'vuetify/labs/VDateInput'
+import { da } from 'vuetify/locale';
 
 
 export default {
@@ -228,7 +232,7 @@ export default {
                 reader.readAsDataURL(this.uploadedFiles[i]);
             }
         },
-        handleComponentFileUpload(component, index, event) {
+        handleComponentFileUpload(component, event) {
             component.uploadedFiles = event.target.files;
             component.previewImages = [];
 
@@ -239,6 +243,7 @@ export default {
                 };
                 reader.readAsDataURL(component.uploadedFiles[i]);
             }
+            console.log(component.uploadedFiles);
         },
         /**@param {Object} connected_nodes_dict 
          * @returns {SubNode} */
@@ -268,9 +273,24 @@ export default {
             console.log(body);
             const data = new FormData();
             data.append('node_create', body);
-            data.append('files', this.uploadedFiles)
+            //data.append('images', this.uploadedFiles); //no funco
+            for (let i=0; i<this.uploadedFiles.length; i++) {
+                data.append('images', this.uploadedFiles[i]);
+            }
+            for (let i=0; i<this.components.length; i++) {
+                const component = this.components[i];
+                console.log(component);
+                for (let j=0; j<component.uploadedFiles.length; j++) {
+                    console.log(component.uploadedFiles[j])
+                    data.append('component_images', component.uploadedFiles[j], `${i}_${j}_${component.uploadedFiles[j].name}`)
+                }
+            }
             try {
-                const response = await axios.put('http://localhost:8000/add-piece/', data)
+                const response = await axios.put('http://localhost:8000/add-piece/', data, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    }
+                })
                 console.log(response);
                 this.closeModal();
             }

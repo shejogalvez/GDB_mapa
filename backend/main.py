@@ -59,6 +59,22 @@ def upload_file(file: UploadFile, file_path: str):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+def attach_images_to_node(node_data: NodeCreate, images: List[UploadFile]):
+    if not images: return
+    for file in images:
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        upload_file(file, file_path)
+        file_properties = {"size" : file.size}
+        file_node = SubNode(node_id= file_path, properties=file_properties, relation_label="tiene_imagen", node_label="imagen", id_key='filename', method='CREATE')
+        node_data.connected_nodes.append(file_node)
+
+def parse_component_files(files: list[UploadFile], n_components: int) -> list[list[UploadFile]]:
+    result = [[] for _ in range(n_components)] # create array with n_component list elements
+    for file in files:
+        component_index, index, filename = file.filename.split('_', 2)
+        result[int(component_index)].append(file)
+    return result
+
 # TEST ROUTE
 @app.get("/")
 async def root():
@@ -102,7 +118,11 @@ def get_pieces_filtered(query_filters: dict[NodeLabel, list[Filter]], skip: int 
 
 
 @app.put("/add-piece", dependencies=[Depends(get_write_permission_user)])
-def add_piece(request: Request, node_create: Annotated[PieceCreate, Body(...)], user: Annotated[UserInDB, Depends(get_current_user)], images: List[UploadFile] = File(...)):
+def add_piece(request: Request, 
+              node_create: Annotated[PieceCreate, Body(...)], 
+              user: Annotated[UserInDB, Depends(get_current_user)], 
+              images: Annotated[list[UploadFile], File()] = None,
+              component_images: Annotated[list[UploadFile], File()] = None):
     """
     Creates/Updates a piece node, creates connections based on ``SubNode``'s specifications and Creates/Updates Components
     attached to this piece on the same transaction, images files are saved in `UPLOAD_DIR` and nodes created are connected 
@@ -118,12 +138,10 @@ def add_piece(request: Request, node_create: Annotated[PieceCreate, Body(...)], 
         images that will attach to the piece node
     """
     if len(node_create.components) < 1: return HTTPException(422, detail="Se espera al menos 1 componente para esta pieza")
-    for file in images:
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        upload_file(file, file_path)
-        file_properties = {"size" : file.size}
-        file_node = SubNode(node_id= file_path, properties=file_properties, relation_label="has_image", node_label="image")
-        node_create.connected_nodes.append(file_node)
+    attach_images_to_node(node_create, images)
+    parsed_component_images = parse_component_files(component_images, len(node_create.components))
+    for i, component in enumerate(node_create.components):
+        attach_images_to_node(component, parsed_component_images[i])
     result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
     log = request_to_log(request, user, node_create)
     logdb = db.create_log(log)
@@ -133,9 +151,9 @@ def add_piece(request: Request, node_create: Annotated[PieceCreate, Body(...)], 
 @app.put("/add-component", dependencies=[Depends(get_write_permission_user)])
 async def add_component(request: Request, 
                         user: Annotated[UserInDB, Depends(get_current_user)], 
-                        node_create: Annotated[NodeCreate, Body(...)],
+                        node_create: Annotated[NodeCreate, Form(...)],
                         piece_id: Annotated[str, Form(...)],
-                        images: List[UploadFile] = File(...)):
+                        images: list[UploadFile] = None):
     """
     endpoint expects paramaters encoded as multipart form 
 
@@ -148,12 +166,7 @@ async def add_component(request: Request,
     images: list[UploadFile]
         images that will attach to the component node
     """
-    for file in images:
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        upload_file(file, file_path)
-        file_properties = {"size" : file.size}
-        file_node = SubNode(node_id= file_path, properties=file_properties, relation_label="has_image", node_label="image")
-        node_create.connected_nodes.append(file_node)
+    attach_images_to_node(node_create, images)
     result = db.create_update_component(piece_id, node_create.id, node_create.connected_nodes, node_create.properties)
     log = request_to_log(request, user, node_create)
     logdb = db.create_log(log)

@@ -48,8 +48,8 @@ def pydict_to_neo(parameters: dict|None) -> str:
 def parse_subnodes(subnodes: list[SubNode], main_node_key: str):
     return "\n".join(
     [f"""WITH DISTINCT {main_node_key}
-        optional MATCH ({main_node_key}) -[relation]- (:{n.node_label})
-        DELETE relation 
+        {f"optional MATCH ({main_node_key}) -[relation]- (:{n.node_label}) DELETE relation" if n.method in ['UPDATE', 'DELETE'] 
+         else ""} 
         MERGE (k:{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) 
         WITH DISTINCT {main_node_key}, k
         SET k += {{{pydict_to_neo(n.properties)}}}
