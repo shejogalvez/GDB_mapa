@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div :class="fixed">
       <h1>Piezas</h1>
 
       <button @click="openModal" class="modern-button">crear pieza</button>
@@ -9,7 +9,7 @@
       <input v-model="filterText" placeholder="Filter by id..." @input="filterRows" />
   
       <!-- Data Table -->
-      <table :class="fixedTable">
+      <table >
         <thead>
           <tr>
             <th>Select</th>
@@ -99,7 +99,6 @@
         currentPage: 0,
         limitResults: 75,
         totalPages: 50,
-        overflow_val: 'auto'
       };
     },
     methods: {
@@ -181,7 +180,7 @@
         }
         return newArr;
       },
-      fixedTable() {
+      fixed() {
         return this.showModal ? 'fixed' : '';
       }
     }, 
@@ -201,7 +200,7 @@
   <style scoped>
   .fixed {
     position: fixed;
-    overflow-y: v-bind('overflow_val');
+    overflow-y: auto;
   }
 
   table {
@@ -234,16 +233,6 @@
   
   input[type="checkbox"] {
     margin-right: 10px;
-  }
-  
-  .main-page {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    background: #f9f9f9;
-    font-family: 'Arial', sans-serif;
   }
   
   h1 {
