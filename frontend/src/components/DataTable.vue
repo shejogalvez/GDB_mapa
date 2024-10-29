@@ -13,21 +13,21 @@
         <thead>
           <tr>
             <th>Select</th>
-            <th>Numero de Inventario</th>
-            <th>Número de registro anterior</th>
-            <th>Coleccion</th>
-            <th>SURDOC</th>
-            <th>Clasificacion</th>
-            <th>Conjunto</th>
-            <th>Autor</th>
-            <th>Fecha de Creacion</th>
-            <th>Contexto Historico</th>
-            <th>Notas de Investigacion</th>
-            <th>Pais</th>
-            <th>Localidad</th>
-            <th>Afiliacion Cultural</th>
-            <th>Fecha de Creacion</th>
-            <th>Exposiciones</th>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Numero de Inventario" property_label="id"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Número de registro anterior" property_label="numero_de registro_anterior"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Coleccion" property_label="coleccion"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="SURDOC" property_label="SURDOC"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Clasificacion" property_label="clasificacion"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Conjunto" property_label="conjunto"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Autor" property_label="autor"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Fecha de Creacion" property_label="fecha_de_creacion"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Contexto Historico" property_label="contexto_historico"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Notas de Investigacion" property_label="notas_investigacion"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Pais" property_label="name" node_label="pais"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Localidad" property_label="name" node_label="localidad"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Afiliacion Cultural" property_label="name" node_label="cultura"></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Fecha de Creacion" property_label=""></FilterTH>
+            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="exposiciones" property_label="name" node_label="pais"></FilterTH>
           </tr>
         </thead>
         <tbody>
@@ -46,7 +46,6 @@
             <td>{{ row.pais?.name }}</td>
             <td>{{ row.localidad?.name }}</td>
             <td>{{ row.cultura?.name }}</td>
-            <td>{{ row.pieza.fecha_de_creacion }}</td>
             <td>{{ row.exposicion }}</td>
           </tr>
         </tbody>
@@ -84,10 +83,12 @@
   <script>
   import axios from 'axios';
   import FormModal from './FormModal.vue';
+  import FilterTH from './FilterTH.vue';
   
   export default {
     components: {
-      FormModal
+      FormModal,
+      FilterTH,
     },
     data() {
       return {
@@ -95,6 +96,7 @@
         filteredRows: [],
         selectedRows: [],
         filterText: "",
+        filters: {},
         showModal: false,
         currentPage: 0,
         limitResults: 75,
@@ -133,19 +135,22 @@
         }
       },
 
-      async filterRows() {
+      updateFilters(filterobj) {
+        const node_label = filterobj.node_label
+        if (this.filters[node_label]) {
+          this.filters[node_label].push(filterobj.filter)
+        }
+        else {
+          this.filters[node_label] = [filterobj.filter]
+        }
+      },
+
+      async filterRows(filterobj) {
         // Filter rows based on filterText input
-        const filter = this.filterText.toLowerCase();
+        this.updateFilters(filterobj);
+        console.log(this.filters)
         try {
-          const response = await axios.post('http://localhost:8000/pieces/', {
-            "pieza": [
-              {
-                "key": "id",
-                "operation": "contains",
-                "val": filter
-              }
-            ]
-          }, 
+          const response = await axios.post('http://localhost:8000/pieces/', this.filters, 
           {
             params: {
               skip: this.currentPage*this.limitResults,
@@ -204,7 +209,7 @@
   }
 
   table {
-    width: 100%;
+    width: 100%;  
     border-collapse: collapse;
     margin: 20px 0;
     display: block;
@@ -218,13 +223,16 @@
     border: 1px solid #ddd;
     text-align: left;
     text-overflow: ellipsis;
-    overflow: hidden;
   }
   
   th {
     background-color: #f4f4f4;
   }
   
+  td {
+    overflow: hidden;
+  }
+
   input[type="text"] {
     margin-bottom: 10px;
     padding: 5px;

@@ -74,13 +74,14 @@ def parse_filters(args: dict[str, list[Filter]]) -> tuple[dict[str, str], dict[s
     if (not args): return ""
     # for each node type store WHERE statements filtering properties
     query_expressions = dict()
+    query_kwargs = dict()
     for label, filters in args.items():
         # create WHERE statement and append to dict
         query_expression = "WHERE "
         query_expression += " AND ".join((f"{label}.{x.key} {parse_operation(x.operation, f"{label}_{x.key}")}" for x in filters)) + "\n"
         query_expressions[label] = query_expression
-        # create kwargs to add to execute_query()
-        query_kwargs = dict([(f"{label}_{x.key}", x.val) for x in filters])
+        # create kwargs to add to execute_query() and merge them with previous labels
+        query_kwargs = dict([(f"{label}_{x.key}", x.val) for x in filters]) | query_kwargs
     return query_expressions, query_kwargs
 
 def match_clause_from_label(query_expressions: dict[str, str], label: str) -> str:
@@ -148,6 +149,7 @@ def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], s
     -------
     ``list(id:str, pieza:dict, pais:dict, localidad:dict, exposicion:dict, cultura:dict, imagen:dict``)"""
     properties_filter_clauses, query_kwargs = parse_filters(query_filters)
+    print(properties_filter_clauses, query_kwargs)
     match_nodes_statement = f"MATCH (pieza: pieza) {where_clause_from_label(properties_filter_clauses, "pieza")}"
     for label in PIEZAS_RELATED_NODES:
         match_nodes_statement += f"{match_clause_from_label(properties_filter_clauses, label)}"
