@@ -1,12 +1,14 @@
 from typing import Annotated, Optional, List, Literal
 from fastapi import FastAPI, Query, Depends, Body, File, Form, UploadFile, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import shutil
 import os
 import json
 
-from pydantic import model_validator
+import base64
+from pathlib import Path
 
 import db
 import user
@@ -74,6 +76,20 @@ def parse_component_files(files: list[UploadFile], n_components: int) -> list[li
         component_index, index, filename = file.filename.split('_', 2)
         result[int(component_index)].append(file)
     return result
+
+def encode_image_to_base64(image_path):
+    with open(image_path, "rb") as image_file:
+        # Read the image file as binary data
+        image_data = image_file.read()
+        # Encode the binary data to base64
+        base64_encoded = base64.b64encode(image_data)
+        # Convert the bytes to a string for easier handling
+        return base64_encoded.decode("utf-8")
+
+def add_image_content_to_node(image_node: dict):
+    print(f"{image_node=}")
+    if image_node:
+        image_node['content'] = encode_image_to_base64(image_node['filename'])
 
 # TEST ROUTE
 @app.get("/")
@@ -196,3 +212,10 @@ async def upload_image(files: List[UploadFile] = File(...)):
 
     return result
 
+@app.get("/get-image/", dependencies=[Depends(get_read_permission_user)])
+def get_image(image_url: Annotated[str, Query()]):
+    image_path = Path(image_url)
+    print(image_path)
+    if not image_path.is_file():
+        return HTTPException(status_code=404, detail=f"image not found")
+    return FileResponse(image_path)

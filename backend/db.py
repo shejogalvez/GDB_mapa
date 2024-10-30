@@ -76,6 +76,8 @@ def parse_filters(args: dict[str, list[Filter]]) -> tuple[dict[str, str], dict[s
     query_expressions = dict()
     query_kwargs = dict()
     for label, filters in args.items():
+        # list of filters may be empty
+        if not filters: continue
         # create WHERE statement and append to dict
         query_expression = "WHERE "
         query_expression += " AND ".join((f"{label}.{x.key} {parse_operation(x.operation, f"{label}_{x.key}")}" for x in filters)) + "\n"
@@ -163,7 +165,7 @@ def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], s
     return result, count
 
 def get_piece_components(piece_id):
-    """ obtiene componentes de una pieza con sus nodos relacionados
+    """ obtiene pieza con sus componentes y sus nodos relacionados
     Parameters
     ----------
     piece_id:str
@@ -177,9 +179,27 @@ def get_piece_components(piece_id):
     OPTIONAL MATCH (componente) -[]-> (forma:forma)
     OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
     OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
-    RETURN elementid(componente) as id, componente, forma, ubicacion, imagen"""
-    result = run_query(query, piece_id=piece_id)
-    return result
+    WITH componente, forma, ubicacion, collect(imagen) as imagenes
+    RETURN DISTINCT elementid(componente) as id, componente, forma, ubicacion, imagenes"""
+    with GraphDatabase.driver(uri, auth=(username, password)) as driver:
+        with driver.session() as session:
+            with session.begin_transaction() as tx:
+                components = tx.run(query, piece_id=piece_id).data()
+                piece = get_piece_by_elementid(piece_id, tx)
+                print(piece, components)
+    return piece, components
+
+def get_piece_by_elementid(piece_id, tx:Transaction=None):
+    query = f"""
+    MATCH (pieza) WHERE elementid(pieza) = $piece_id
+    {MATCH_RELATED_NODES}
+    WITH pieza, pais, localidad, exposicion, cultura, collect(imagen) as imagenes
+    RETURN DISTINCT elementid(pieza) as id, pieza, pais, localidad, exposicion, cultura, imagenes"""
+    if tx:
+        result = tx.run(query, piece_id=piece_id).data()
+    else: 
+        result = run_query(query, piece_id=piece_id)
+    return result[0] if result else None
 
 def filter_by_nodes_names_connected(name_array: list, tag: str, other_label: str = "", skip: int = 0, limit: int = 0):
     if other_label:

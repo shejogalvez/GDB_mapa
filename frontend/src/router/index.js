@@ -13,12 +13,9 @@ const routes = [
     component: DataTable
   },
   {
-    path: '/details/*',
+    path: '/details/:id',
     name: 'Details',
     component: PieceDetails,
-    props: (route) => ({
-      ...route.params
-    })
 
   },
   { path: '/:pathMatch(.*)*', name: "nn",
