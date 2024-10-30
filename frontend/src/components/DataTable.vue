@@ -6,28 +6,27 @@
       <FormModal :isVisible="showModal" @close="closeModal" />
       
       <!-- Filter Input -->
-      <input v-model="filterText" placeholder="Filter by id..." @input="filterRows" />
   
       <!-- Data Table -->
       <table >
         <thead>
           <tr>
             <th>Select</th>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Numero de Inventario" property_label="id"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Número de registro anterior" property_label="numero_de registro_anterior"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Coleccion" property_label="coleccion"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="SURDOC" property_label="SURDOC"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Clasificacion" property_label="clasificacion"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Conjunto" property_label="conjunto"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Autor" property_label="autor"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Fecha de Creacion" property_label="fecha_de_creacion"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Contexto Historico" property_label="contexto_historico"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Notas de Investigacion" property_label="notas_investigacion"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Pais" property_label="name" node_label="pais"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Localidad" property_label="name" node_label="localidad"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Afiliacion Cultural" property_label="name" node_label="cultura"></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="Fecha de Creacion" property_label=""></FilterTH>
-            <FilterTH @applyFilter="(filterobj) => {filterRows(filterobj)}" header_text="exposiciones" property_label="name" node_label="pais"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Numero de Inventario" property_label="id"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Número de registro anterior" property_label="numero_de registro_anterior"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Coleccion" property_label="coleccion"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="SURDOC" property_label="SURDOC"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Clasificacion" property_label="clasificacion"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Conjunto" property_label="conjunto"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Autor" property_label="autor"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Fecha de Creacion" property_label="fecha_de_creacion"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Contexto Historico" property_label="contexto_historico"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Notas de Investigacion" property_label="notas_investigacion"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Pais" property_label="name" node_label="pais"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Localidad" property_label="name" node_label="localidad"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Afiliacion Cultural" property_label="name" node_label="cultura"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Fecha de Creacion" property_label=""></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="exposiciones" property_label="name" node_label="pais"></FilterTH>
           </tr>
         </thead>
         <tbody>
@@ -50,14 +49,6 @@
           </tr>
         </tbody>
       </table>
-  
-      <!-- Selected Rows Output -->
-      <div v-if="selectedRows.length > 0">
-        <h2>Selected Rows:</h2>
-        <ul>
-          <li v-for="row in selectedRows" :key="row.pieza.id">{{ row.pieza.id }}</li>
-        </ul>
-      </div>
 
       <!-- page select -->
       <div class="pagination-controls">
@@ -84,6 +75,7 @@
   import axios from 'axios';
   import FormModal from './FormModal.vue';
   import FilterTH from './FilterTH.vue';
+  import { useStore } from '@/stores/store';
   
   export default {
     components: {
@@ -94,9 +86,7 @@
       return {
         rows: [],
         filteredRows: [],
-        selectedRows: [],
         filterText: "",
-        filters: {},
         showModal: false,
         currentPage: 0,
         limitResults: 75,
@@ -107,7 +97,7 @@
 
       goToDetails(row) {
         console.log(row);
-        this.$router.push({name: `Details`, params: {...row, id:row.id}});  // Navigate to the user details page
+        this.$router.push({name: `Details`, params: {id:row.id}});  // Navigate to the user details page
       },
 
       async fetchData() {
@@ -135,22 +125,12 @@
         }
       },
 
-      updateFilters(filterobj) {
-        const node_label = filterobj.node_label
-        if (this.filters[node_label]) {
-          this.filters[node_label].push(filterobj.filter)
-        }
-        else {
-          this.filters[node_label] = [filterobj.filter]
-        }
-      },
-
-      async filterRows(filterobj) {
+      async filterRows() {
         // Filter rows based on filterText input
-        this.updateFilters(filterobj);
-        console.log(this.filters)
+        const filters = useStore().$state.filters;
+        console.log(filters);
         try {
-          const response = await axios.post('http://localhost:8000/pieces/', this.filters, 
+          const response = await axios.post('http://localhost:8000/pieces/', filters, 
           {
             params: {
               skip: this.currentPage*this.limitResults,

@@ -31,6 +31,7 @@
 </template>
 
 <script>
+import { useStore } from '@/stores/store';
 export default  {
     props: {
         header_text: {
@@ -52,27 +53,48 @@ export default  {
             isOpen: false,
             val: '',
             operation: '',
-            isFilterApplied: false,
         }
     },
     methods: {
         applyFilters() {
-            if (!this.isFilterApplied)
-                this.$emit('applyFilter', {
-                    node_label: this.node_label,
-                    filter: {
-                        key: this.property_label,
-                        operation: this.operation,
-                        val: this.val
-                    }
+            const store = useStore();
+            if (!this.isFilterApplied) {
+                const filterObj = {
+                    key: this.property_label,
+                    operation: this.operation,
+                    val: this.val
+                }
+                store.$patch((state) => {
+                    state.filters[this.node_label].push(filterObj);
                 })
-            this.isFilterApplied = !this.isFilterApplied;
-            this.isOpen = false;
+            }
+            else {
+                store.$patch((state) => {
+                    state.filters[this.node_label] = state.filters[this.node_label].filter((filter) => filter.key != this.property_label);
+                })
+            }
+            this.$emit('applyFilter');
+            this.reset()
         },
         openMenu() {
             this.isOpen = !this.isOpen;
+        },
+        reset() {
+            Object.assign(this.$data, this.emptyData);
         }
-    }
+    },
+    computed: {
+        isFilterApplied() {
+            return Boolean(useStore().$state.filters[this.node_label].find((filter) => filter.key === this.property_label))
+        },
+        emptyData() {
+            return {
+                isOpen: false,
+                val: '',
+                operation: '',
+            }
+        }
+    },
 }
 </script>
 
