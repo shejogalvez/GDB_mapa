@@ -11,7 +11,7 @@
         <!-- Select Comparison Option -->
         <label>
             Comparison:
-            <select v-model="operation">
+            <select :disabled="isFilterApplied" v-model="operation">
                 <option value="=">Equals</option>
                 <option value="contains">Contains</option>
                 <option value="<">Is Less Than</option>
@@ -22,7 +22,7 @@
         <!-- Text Input -->
         <label>
             Value:
-            <input type="text" v-model="val" />
+            <input :disabled="isFilterApplied" type="text" v-model="val" />
         </label>
         
         <!-- Apply Filters Button -->
@@ -73,9 +73,10 @@ export default  {
                 store.$patch((state) => {
                     state.filters[this.node_label] = state.filters[this.node_label].filter((filter) => filter.key != this.property_label);
                 })
+                this.reset();
             }
             this.$emit('applyFilter');
-            this.reset()
+            this.isOpen = false;
         },
         openMenu() {
             this.isOpen = !this.isOpen;
