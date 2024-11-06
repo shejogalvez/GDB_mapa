@@ -9,6 +9,8 @@ import json
 
 import base64
 from pathlib import Path
+import filetype
+from datetime import datetime
 
 import db
 import user
@@ -57,39 +59,63 @@ def request_to_log(request: Request, user: UserInDB, body: NodeCreate) -> Log:
     request_method = request.method
     return Log(username=user.username, endpoint=endpoint, request_method=request_method, request_body=body.model_dump_json(), node_elementid=body.id)
 
-def upload_file(file: UploadFile, file_path: str):
+def upload_file(file: UploadFile, relative_path: str):
+    file_path = os.path.join(UPLOAD_DIR, relative_path)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-def attach_images_to_node(node_data: NodeCreate, images: List[UploadFile]):
+def attach_images_to_node(node_data: NodeCreate, images: List[UploadFile], prefix: str = ""):
     if not images: return
     for file in images:
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-        upload_file(file, file_path)
-        file_properties = {"size" : file.size}
-        file_node = SubNode(node_id= file_path, properties=file_properties, relation_label="tiene_imagen", node_label="imagen", id_key='filename', method='CREATE')
+        validate_file_size_type(file)
+        relative_path = f"{prefix}_{str(datetime.now())}"
+        upload_file(file, relative_path)
+        file_properties = {"size" : file.size, "name" : file.filename}
+        file_node = SubNode(node_id= relative_path, properties=file_properties, relation_label="tiene_imagen", node_label="imagen", id_key='filename', method='CREATE')
         node_data.connected_nodes.append(file_node)
 
 def parse_component_files(files: list[UploadFile], n_components: int) -> list[list[UploadFile]]:
+    if not files: 
+        files = []
     result = [[] for _ in range(n_components)] # create array with n_component list elements
     for file in files:
+        # sorts files corresponding to each component
         component_index, index, filename = file.filename.split('_', 2)
         result[int(component_index)].append(file)
+        # extracts original filename
+        file.filename = filename
     return result
 
-def encode_image_to_base64(image_path):
-    with open(image_path, "rb") as image_file:
-        # Read the image file as binary data
-        image_data = image_file.read()
-        # Encode the binary data to base64
-        base64_encoded = base64.b64encode(image_data)
-        # Convert the bytes to a string for easier handling
-        return base64_encoded.decode("utf-8")
+def delete_images(node_with_images: NodeCreate, tg: asyncio.TaskGroup):
+    for image in filter(lambda node: node.node_label == 'imagen', node_with_images.connected_nodes):
+        tg.create_task(os.remove(image.properties['filename']))
 
-def add_image_content_to_node(image_node: dict):
-    print(f"{image_node=}")
-    if image_node:
-        image_node['content'] = encode_image_to_base64(image_node['filename'])
+def validate_file_size_type(file: IO):
+    FILE_SIZE = 2097152 # 2MB
+
+    accepted_file_types = ["image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif", "image/heics", "png",
+                          "jpeg", "jpg", "heic", "heif", "heics" 
+                          ] 
+    file_info = filetype.guess(file.file)
+    if file_info is None:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unable to determine file type",
+        )
+
+    detected_content_type = file_info.extension.lower()
+
+    if (
+        file.content_type not in accepted_file_types
+        or detected_content_type not in accepted_file_types
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported file type",
+        )
+    
+    if file.size > FILE_SIZE:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Too large")
 
 # TEST ROUTE
 @app.get("/")
@@ -98,6 +124,7 @@ async def root():
     print(result[0])
     return result
 
+### ROUTES ###
 @app.get("/nodes", dependencies=[Depends(get_read_permission_user)])
 async def get_nodes(labels: Annotated[list[NodeLabel], Query()]):
     return db.get_nodes_paginated(labels=labels, skip=0, limit=0)
@@ -214,6 +241,7 @@ async def upload_image(files: List[UploadFile] = File(...)):
 
 @app.get("/get-image/", dependencies=[Depends(get_read_permission_user)])
 def get_image(image_url: Annotated[str, Query()]):
+    image_url = os.path.join(UPLOAD_DIR, image_url)
     image_path = Path(image_url)
     print(image_path)
     if not image_path.is_file():
