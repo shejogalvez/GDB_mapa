@@ -6,69 +6,75 @@
             <div id="form-container" class="modal">
                 <h2>Crear Pieza</h2>
                 <span class="close" @click="closeModal">&times;</span>
-                    <v-form class="form-content" id="agregar-producto-form" method="put" enctype="multipart/form-data">
+                    <v-form class="form-content" @submit="submitForm">
                         <br>
                         <v-row>
-                            <v-text-field type="text" label="numero_de_inventario" v-model="id" class="input-field" maxlength="5"></v-text-field>
-                            <v-text-field label="coleccion" v-model="properties.coleccion" class="input-field"></v-text-field>
+                            <v-text-field :rules="rules" label="numero_de_inventario" v-model="pieceData.properties.id" class="input-field"></v-text-field>
+                            <v-text-field label="coleccion" v-model="pieceData.properties.coleccion" class="input-field"></v-text-field>
                         </v-row>
                         
                         <v-row>
-                            <v-text-field label="SURDOC" v-model="properties.SURDOC" class="input-field" ></v-text-field>
-                            <v-text-field label="conjunto" v-model="properties.conjunto" class="input-field" ></v-text-field>
+                            <v-text-field label="SURDOC" v-model="pieceData.properties.SURDOC" class="input-field" ></v-text-field>
+                            <v-text-field label="conjunto" v-model="pieceData.properties.conjunto" class="input-field" ></v-text-field>
                         </v-row>
-                        <v-text-field label="clasificacion" v-model="properties.clasificacion" class="input-field" ></v-text-field>
+                        <v-text-field label="clasificacion" v-model="pieceData.properties.clasificacion" class="input-field" ></v-text-field>
                         
                         
-                        <v-textarea label="contexto_historico" v-model="properties.contexto_historico" class="input-field" ></v-textarea>
+                        <v-textarea label="contexto_historico" v-model="pieceData.properties.contexto_historico" class="input-field" ></v-textarea>
                         
-                        <v-textarea label="notas_investigacion" v-model="properties.notas_investigacion" class="input-field" ></v-textarea>
+                        <v-textarea label="notas_investigacion" v-model="pieceData.properties.notas_investigacion" class="input-field" ></v-textarea>
                         
-                        <v-textarea label="bibliografia" v-model="properties.bibliografia" class="input-field" ></v-textarea>
+                        <v-textarea label="bibliografia" v-model="pieceData.properties.bibliografia" class="input-field" ></v-textarea>
 
                         <v-row>
-                            <v-text-field label="avaluo" v-model="properties.avaluo" class="input-field" ></v-text-field>
-                            <v-text-field label="autor" v-model="properties.autor" class="input-field" ></v-text-field>
+                            <v-text-field label="avaluo" v-model="pieceData.properties.avaluo" class="input-field" ></v-text-field>
+                            <v-text-field label="autor" v-model="pieceData.properties.autor" class="input-field" ></v-text-field>
                         </v-row>
 
-                        <v-text-field label="procedencia" v-model="properties.procedencia" class="input-field" ></v-text-field>
+                        <v-text-field label="procedencia" v-model="pieceData.properties.procedencia" class="input-field" ></v-text-field>
                         
-                        <v-text-field label="donante" v-model="properties.donante" class="input-field" ></v-text-field>
+                        <v-text-field label="donante" v-model="pieceData.properties.donante" class="input-field" ></v-text-field>
                         
-                        <v-date-input label="fecha_ingreso" v-model="properties.fecha_ingreso" class="input-field" ></v-date-input>
+                        <v-date-input label="fecha_ingreso" v-model="pieceData.properties.fecha_ingreso" class="input-field" ></v-date-input>
                         
                         <v-combobox 
                             label="pais" 
                             :items="paises_data.map(o => o.properties.name)"
-                            v-model="connected_nodes.pais"
+                            v-model="pieceData.connected_nodes.pais"
                         ></v-combobox>
 
                         <v-combobox 
                             label="localidad" 
                             :items="localidades_data.map(o => o.properties.name)"
-                            v-model="connected_nodes.localidad"
+                            v-model="pieceData.connected_nodes.localidad"
                         ></v-combobox>
                         
                         <v-combobox 
                             label="cultura" 
                             :items="culturas_data.map(o => o.properties.name)"
-                            v-model="connected_nodes.cultura"
+                            v-model="pieceData.connected_nodes.cultura"
+                        ></v-combobox>
+                        
+                        <v-combobox 
+                            label="exposición" 
+                            :items="exposiciones_data.map(o => o.properties.name)"
+                            v-model="pieceData.connected_nodes.exposicion"
                         ></v-combobox>
                         
                         <!-- Multiple Image Upload -->
                         <label for="imagen"> subir imagen piezas</label>
-                        <input type="file" id="imagen" name="imagen" @change="handleComponentFileUpload(this, $event)" multiple></input>
+                        <input type="file" id="imagen" name="imagen" @change="handleComponentFileUpload(pieceData, $event)" multiple></input>
 
                         <!-- Preview Images -->
                         <div class="image-preview">
-                            <div v-for="(image, index) in previewImages" :key="index">
+                            <div v-for="(image, index) in pieceData.previewImages" :key="index">
                                 <img :src="image" alt="Image Preview" class="preview">
                             </div>
                         </div>
                         
                         <h3>Componentes</h3>
 
-                        <div v-for="(component, i) in components" :key="i">
+                        <div v-for="(component, i) in pieceData.components" :key="i">
 
                             
                             <v-text-field label="nombre_comun" v-model="component.properties.nombre_comun" class="input-field" ></v-text-field>
@@ -118,12 +124,13 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <button type="button" @click="agregarComponente">+ componente</button>
-                        
+                        <div class="buttons-div">
+                            <button type="button" @click="agregarComponente">+ componente</button>
+                            <button v-if="pieceData.components.length > 1" type="button" style="float: right;" @click="deleteComponent">- componente</button>
+                        </div>
                         <br><br>
-                        <button type="button" @click="submitForm">Submit</button>
                         <!-- Submit Button -->
+                        <ConfirmAction text="Se van a guardar los datos" title="Confirmar envío de formulario" buttonText="Submit" :confirmFunction="submitForm"></ConfirmAction>
                     </v-form>
             </div>
     
@@ -135,7 +142,8 @@
 import axios from 'axios';
 import TreeDropdown from './TreeDropdown.vue'
 import { VDateInput } from 'vuetify/labs/VDateInput'
-import { da } from 'vuetify/locale';
+import { useStore } from '@/stores/store';
+import ConfirmAction from './ConfirmAction.vue';
 
 
 export default {
@@ -143,11 +151,12 @@ export default {
         isVisible: {
             type: Boolean,
             required: true
-        }
+        },
     },
     components: {
       TreeDropdown,
-      VDateInput
+      VDateInput,
+      ConfirmAction,
     },
     data() {
         /** @typedef {object} Ubicacion
@@ -165,34 +174,20 @@ export default {
          * @property {Object} properties
         */
         return {
-            id: "",
-            properties: {
-            },
-            connected_nodes: {},
-            pais: null,
-            localidad: null,
-            cultura: null,
-            exposicion: null,
-            uploadedFiles: [],
-            previewImages: [],
-            components: [{
-                /** @type {Ubicacion} */
-                selectedUbicacion: null,
-                id: null,
-                connected_nodes: {},
-                properties: {},
-                uploadedFiles: [],
-                previewImages: []
-            }],
-            // data fetched
-            ubicaciones_data: [],
-            paises_data: [],
-            culturas_data: [], 
-            localidades_data: []
+            pieceStore: useStore(),
+            componentsToDelete: [],
+            confirmSubmit: false,
+            rules: [
+                value => {
+                    if (value) return true
+                    return 'Campo no puede estar vacio.'
+                },
+             ],
         };
     },
     mounted() {
         this.fetchData();
+        console.log(this.$data);
     },
     methods: {
         async fetchData() {
@@ -210,6 +205,9 @@ export default {
                 axios.get('http://localhost:8000/nodes/', {params: {
                     labels: 'cultura'
                 }}).then(response => {this.culturas_data = response.data})
+                axios.get('http://localhost:8000/nodes/', {params: {
+                    labels: 'exposicion'
+                }}).then(response => {this.exposiciones_data = response.data})
                   
             }
             catch (error) {
@@ -218,19 +216,6 @@ export default {
         },
         closeModal() {
             this.$emit('close');
-        },
-        handleFileUpload(event) {
-            this.uploadedFiles = event.target.files;
-            this.previewImages = [];
-
-            // Generate previews for each uploaded image
-            for (let i = 0; i < this.uploadedFiles.length; i++) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    this.previewImages.push(e.target.result);
-                };
-                reader.readAsDataURL(this.uploadedFiles[i]);
-            }
         },
         handleComponentFileUpload(component, event) {
             component.uploadedFiles = event.target.files;
@@ -243,29 +228,31 @@ export default {
                 };
                 reader.readAsDataURL(component.uploadedFiles[i]);
             }
-            console.log(component.uploadedFiles);
+            //console.log(component.uploadedFiles);
         },
         /**@param {Object} connected_nodes_dict 
          * @returns {SubNode} */
         parseSubnodes(connected_nodes_dict, id_key="name") {
             let result = [];
             for (const [key, val] of Object.entries(connected_nodes_dict)) {
-                if (val)
-                    result.push({
-                        node_id: val,
-                        node_label: key,
-                        id_key: id_key
-                    });
+                result.push({
+                    node_id: val,
+                    node_label: key,
+                    id_key: id_key
+                });
             }
             return result;
         },
         async submitForm() {
-            console.log(this );
+            let pieceData = this.pieceData;
+            if (this.rules.some((rule) => rule(pieceData.properties.id) !== true)) return
+            console.log(pieceData);
             const body = JSON.stringify({
-                id: this.id,
-                properties: this.properties,
-                connected_nodes: this.parseSubnodes(this.connected_nodes),
-                components: this.components.map(component => ({
+                id: pieceData.id,
+                properties: pieceData.properties,
+                connected_nodes: this.parseSubnodes(pieceData.connected_nodes),
+                components: pieceData.components.map(component => ({
+                    id: component.id, // fix
                     properties: component.properties,
                     connected_nodes: this.parseSubnodes(component.connected_nodes, "id")
                 }))
@@ -274,11 +261,11 @@ export default {
             const data = new FormData();
             data.append('node_create', body);
             //data.append('images', this.uploadedFiles); //no funco
-            for (let i=0; i<this.uploadedFiles.length; i++) {
-                data.append('images', this.uploadedFiles[i]);
+            for (let i=0; i<pieceData.uploadedFiles.length; i++) {
+                data.append('images', pieceData.uploadedFiles[i]);
             }
-            for (let i=0; i<this.components.length; i++) {
-                const component = this.components[i];
+            for (let i=0; i<pieceData.components.length; i++) {
+                const component = pieceData.components[i];
                 console.log(component);
                 for (let j=0; j<component.uploadedFiles.length; j++) {
                     console.log(component.uploadedFiles[j])
@@ -293,13 +280,14 @@ export default {
                 })
                 console.log(response);
                 this.closeModal();
+                this.pieceStore.$reset();
             }
             catch (e) {
                 console.error(e.response.data.detail);
             }
         },
         agregarComponente() {
-            this.components.push({
+            this.pieceData.components.push({
                 /** @type {Ubicacion} */
                 selectedUbicacion: null,
                 id: null,
@@ -308,6 +296,14 @@ export default {
                 uploadedFiles: [],
                 previewImages: []
             });
+        },
+        deleteComponent() {
+            this.pieceData.components.pop();
+        }
+    },
+    computed: {
+        pieceData() {
+            return this.pieceStore.$state.currentPiece
         }
     }
 };
@@ -411,10 +407,8 @@ export default {
 .input-field {
     padding: 10px;
     border: 1px solid #ccc;
-    border-radius: 4px;
-    -webkit-box-sizing: border-box; /* Safari/Chrome, other WebKit */
-    -moz-box-sizing: border-box;    /* Firefox, other Gecko */
-    box-sizing: border-box;         /* Opera/IE 8+ */
+    border-radius: 1px;
+    margin: 2px;
 }
 
 /* Styles for form elements */
@@ -430,6 +424,7 @@ button {
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s ease;
+  max-width: 200px;
 }
 
 button:hover {
