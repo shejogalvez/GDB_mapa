@@ -92,6 +92,7 @@ def parse_filters(args: dict[str, list[Filter]]) -> tuple[dict[str, str], dict[s
         if not filters: continue
         # create WHERE statement and append to dict
         query_expression = "WHERE "
+        # concatenates conditions and uses the token f"{label}_{x.key}" to encode the arg value as query argument
         query_expression += " AND ".join((f"{label}.{x.key} {parse_operation(x.operation, f"{label}_{x.key}")}" for x in filters)) + "\n"
         query_expressions[label] = query_expression
         # create kwargs to add to execute_query() and merge them with previous labels
@@ -307,7 +308,8 @@ def delete_component(tx: Transaction, component_id: str):
     query = """
             MATCH (c {id: $nodeId})
             OPTIONAL MATCH (c)--(f :forma)
-            DETACH DELETE f, c
+            OPTIONAL MATCH (c)--(i :imagen)
+            DETACH DELETE f, c, i
             """
     return tx.run(query, nodeId=component_id)
 
@@ -317,7 +319,9 @@ def detete_piece(tx: Transaction, id: str):
             MATCH (n {id: $nodeId})
             OPTIONAL MATCH (n)--(c: componente)
             OPTIONAL MATCH (c)--(f :forma)
-            DETACH DELETE f, n, c
+            OPTIONAL MATCH (n)--(in :imagen)
+            OPTIONAL MATCH (c)--(ic :imagen)
+            DETACH DELETE f, n, c, in, ic
             """
     return tx.run(query, nodeId=id)
 
