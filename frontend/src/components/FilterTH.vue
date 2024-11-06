@@ -31,7 +31,7 @@
 </template>
 
 <script>
-import { useStore } from '@/stores/store';
+import { useFilterStore } from '@/stores/store';
 export default  {
     props: {
         header_text: {
@@ -53,11 +53,12 @@ export default  {
             isOpen: false,
             val: '',
             operation: '',
+            store: useFilterStore()
         }
     },
     methods: {
         applyFilters() {
-            const store = useStore();
+            const store = this.store
             if (!this.isFilterApplied) {
                 const filterObj = {
                     key: this.property_label,
@@ -80,20 +81,15 @@ export default  {
             this.isOpen = !this.isOpen;
         },
         reset() {
-            Object.assign(this.$data, this.emptyData);
+            this.isOpen= false;
+            this.val= '';
+            this.operation= '';
         }
     },
     computed: {
         isFilterApplied() {
-            return Boolean(useStore().$state.filters[this.node_label].find((filter) => filter.key === this.property_label))
+            return Boolean(this.store.$state.filters[this.node_label].find((filter) => filter.key === this.property_label))
         },
-        emptyData() {
-            return {
-                isOpen: false,
-                val: '',
-                operation: '',
-            }
-        }
     },
 }
 </script>

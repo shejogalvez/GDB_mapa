@@ -75,7 +75,7 @@
   import axios from 'axios';
   import FormModal from './FormModal.vue';
   import FilterTH from './FilterTH.vue';
-  import { useStore } from '@/stores/store';
+  import { useStore, useFilterStore } from '@/stores/store';
   
   export default {
     components: {
@@ -127,7 +127,7 @@
 
       async filterRows() {
         // Filter rows based on filterText input
-        const filters = useStore().$state.filters;
+        const filters = useFilterStore().$state.filters;
         console.log(filters);
         try {
           const response = await axios.post('http://localhost:8000/pieces/', filters, 
@@ -149,6 +149,7 @@
       },
 
       openModal() {
+        console.log(useStore().$state);
         this.showModal = true;  // Open the modal
       },
 
