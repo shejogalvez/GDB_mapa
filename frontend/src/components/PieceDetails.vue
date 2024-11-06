@@ -1,32 +1,38 @@
 <template>
     <div class="user-details-container">
+      <button @click="openModal" class="modern-button">editar pieza</button>
+      <FormModal :isVisible="showModal" @close="()=>{showModal = false}" />
       <div class="user-details-card">
         <h1>Info pieza</h1>
         <!-- User Image -->
-        <div v-for="img in this.piece.imagenes" class="user-image">
-          <img :src="img.content" alt="Imagen pieza" />
+        <div v-for="img in piece.previewImages" class="user-image">
+          <img :src="img" alt="Imagen pieza" />
         </div>
-  
+        
         <!-- User Information -->
         <div class="user-info">
-          <template>
-            <p v-for="(val, key, idx) in this.piece.pieza"><strong>{{ key }}:</strong> {{ val }} </p>
+          <template v-for="(val, key) in piece.properties">
+            <p>
+              <strong>{{ key }}:</strong> {{ val }} 
+            </p>
           </template>
-            <p><strong>pais:</strong> {{ this.piece.pais?.name }} </p>
-            <p><strong>localidad:</strong> {{ this.piece.localidad?.name }} </p>
-            <p><strong>filiación cultural:</strong> {{ this.piece.cultura?.name }} </p>
+            <p v-if="piece.pais"><strong>pais:</strong> {{ piece.pais.name }} </p>
+            <p v-if="piece.localidad"><strong>localidad:</strong> {{ piece.localidad.name }} </p>
+            <p v-if="piece.cultura"><strong>filiación cultural:</strong> {{ piece.cultura.name }} </p>
+            <p v-if="piece.exposicion"><strong>exposicion:</strong> {{ piece.exposicion.name }} </p>
         </div>
 
         <h1>Info componentes</h1>
-        <div v-for="component in this.components" class="user-info">
+        <div v-for="component in piece.components" class="user-info">
           <h3>{{ component.id }}</h3>
           <div class="user-image">
-            <img v-for="img in component.imagenes" :src="img.content" alt="Imagen componente" />
+            <img v-for="img in component.previewImages" :src="img" alt="Imagen componente" />
           </div>
-          <template>
-            <p v-for="(val, key, idx) in component.component"><strong>{{ key }}:</strong> {{ val }} </p>
+          <template v-for="(val, key, idx) in component.properties">
+            <p><strong>{{ key }}:</strong> {{ val }} </p>
           </template>
-            <p><strong>ubicacion:</strong> {{ component.ubicacion?.name }} </p>
+            <p v-if="component.ubicacion"><strong>ubicacion:</strong> {{ component.ubicacion.name }} </p>
+            <br><br>
         </div>
       </div>
     </div>
@@ -41,49 +47,86 @@
       return {
         components: [],
         piece: {},
+        showModal: false,
       };
     },
-    mounted() {
-      this.fetchDetails();
+    async beforeCreate() {
+      const pieceId = this.$route.params.id;  // Get user ID from the route
+      try {
+        const response = await axios.get(`http://localhost:8000/components/`, {params: {
+          piece_id: pieceId,
+        }});
+        console.log(response);
+        let pieceData = response.data[0]
+        const properties = pieceData['pieza'];
+        delete pieceData['pieza'];
+        const connected_nodes = {}
+        for (const key of ['pais', 'localidad', 'exposicion', 'cultura']) {
+          const val = pieceData[key];
+          if (val) {
+            connected_nodes[key] = val.name;
+          }
+        }
+        pieceData.connected_nodes = connected_nodes;
+        pieceData.properties = properties;
+        pieceData.uploadedFiles = [];
+        pieceData.previewImages = [];
+        let componentsData = response.data[1]
+        for (const component of componentsData){
+          const cprops = component['componente'];
+          delete component['componente'];
+          const connected_nodes = {}
+          for (const key of ['forma', 'ubicacion']) {
+          const val = pieceData[key];
+            if (val) {
+              connected_nodes[key] = val.name;
+            }
+          }
+          component.connected_nodes = connected_nodes;
+          component.properties = cprops;
+          component.uploadedFiles = [];
+          component.previewImages = [];
+        }
+        for (const img of pieceData.imagenes) {
+          this.setImageData(img, pieceData);
+        }
+        for (const component of this.components) {
+          for (const img of component.imagenes) {
+            this.setImageData(img, componentsData);
+          }
+        }
+        pieceData.components = componentsData;
+        
+        useStore().$state.currentPiece = pieceData;
+        this.piece = pieceData
+        console.log(this.piece);
+      } catch (error) {
+        console.log(this.$route.params);
+        console.error('Error fetching user details:', error);
+      }
     },
     methods: {
       // Fetch user details from the backend using an ID
       async fetchDetails() {
-        const pieceId = this.$route.params.id;  // Get user ID from the route
-        try {
-          const response = await axios.get(`http://localhost:8000/components/`, {params: {
-            piece_id: pieceId,
-          }});
-          console.log(response);
-          this.components = response.data[1];
-          this.piece = response.data[0];
-          for (const img of this.piece.imagenes) {
-            this.setImageData(img);
-          }
-          for (const component of this.components) {
-            for (const img of component.imagenes) {
-              this.setImageData(img);
-            }
-          }
-          useStore().$state.currentPiece = response.data[0];
-          useStore().$state.currentPiece.components = response.data[1];
-          console.log(useStore().$state);
-          console.log(encodeURIComponent(this.piece.imagenes[0].filename));
-        } catch (error) {
-          console.log(this.$route.params);
-          console.error('Error fetching user details:', error);
-        }
       },
-      setImageData(img_node) {
+      setImageData(img_node, parent_object) {
+        console.log(img_node);
         axios.get(`http://localhost:8000/get-image/`, {params: {image_url: img_node.filename}, responseType: 'blob'},)
         .then(async res => {
           const reader = new FileReader();
           reader.onload = (e) => {
-            img_node.content = e.target.result;
+            parent_object.previewImages.push(e.target.result);
           };
           reader.readAsDataURL(res.data);
         })
-      }
+      },
+      openModal() {
+        console.log(useStore().$state.currentPiece)
+        this.showModal = true
+      },
+      closeModal() {
+        this.showModal = false;  // Close the modal
+      },
     },
   };
   </script>
@@ -130,6 +173,26 @@
   p {
     font-size: 1rem;
     margin-bottom: 5px;
+  }
+  
+  .modern-button {
+    padding: 12px 24px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    max-height: 50px;
+    margin-top: 15px;
+  }
+  
+  .modern-button:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
   }
   </style>
   
