@@ -1,21 +1,22 @@
-from typing import Annotated, Optional, List, Literal
+from typing import Annotated, Optional, List, Literal, IO
 from fastapi import FastAPI, Query, Depends, Body, File, Form, UploadFile, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
+from neo4j.exceptions import ConstraintError
 import shutil
 import os
 import json
 
-import base64
 from pathlib import Path
+import asyncio
 import filetype
 from datetime import datetime
 
 import db
 import user
 from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user, get_current_user, add_user
-from models import NodeUpdate, PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum, NodeLabel
+from models import PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum, NodeLabel
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,6 +55,7 @@ UPLOAD_DIR = os.getenv("IMPORT_PATH", "uploaded_images")
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
+### UTILS ###
 def request_to_log(request: Request, user: UserInDB, body: NodeCreate) -> Log:
     endpoint = request.url.path
     request_method = request.method
@@ -159,6 +161,9 @@ def get_pieces_filtered(query_filters: dict[NodeLabel, list[Filter]], skip: int 
     # property_filter = json.decoder.JSONDecoder().decode(params["property_filter"])
     return db.get_pieces_info_paginated_filtered(query_filters, skip, limit)
 
+@app.get("/all/", dependencies=[Depends(get_read_permission_user)])
+def get_pieces_with_components_paginated(skip: int = 0, limit: int = 50):
+    return db.get_pieces_with_components_paginated(skip, limit)
 
 @app.put("/add-piece", dependencies=[Depends(get_write_permission_user)])
 def add_piece(request: Request, 
@@ -185,7 +190,10 @@ def add_piece(request: Request,
     parsed_component_images = parse_component_files(component_images, len(node_create.components))
     for i, component in enumerate(node_create.components):
         attach_images_to_node(component, parsed_component_images[i])
-    result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
+    try:
+        result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
+    except ConstraintError:
+        return HTTPException(401, detail="Número de inventario repetido")
     log = request_to_log(request, user, node_create)
     logdb = db.create_log(log)
     print(logdb)
@@ -247,3 +255,16 @@ def get_image(image_url: Annotated[str, Query()]):
     if not image_path.is_file():
         return HTTPException(status_code=404, detail=f"image not found")
     return FileResponse(image_path)
+
+@app.patch("/update-piece/", dependencies=[Depends(get_write_permission_user)])
+async def update_piece(request: Request, 
+                       node_create: Annotated[PieceCreate, Body(...)], 
+                       user: Annotated[UserInDB, Depends(get_current_user)], 
+                       images: Annotated[list[UploadFile], File()] = None,
+                       component_images: Annotated[list[UploadFile], File()] = []):
+    async with asyncio.TaskGroup() as tg:
+        delete_images(node_create, tg)
+        for component in node_create.components:
+            delete_images(component, tg)
+    
+    return add_piece(request, node_create, user, images, component_images)
