@@ -47,6 +47,13 @@
             <td>{{ row.cultura?.name }}</td>
             <td>{{ row.exposicion }}</td>
           </tr>
+          <template v-if="filteredRows.length == 0">
+            <tr>
+              <td colspan="9999" style="height: 250px;">
+                    No hay piezas con estos filtros
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
 
@@ -101,8 +108,9 @@
       },
 
       async fetchData() {
+        const filters = useFilterStore().$state.filters;
         try {
-          const response = await axios.get('http://localhost:8000/pieces/', {params: {
+          const response = await axios.post('http://localhost:8000/pieces/', filters, {params: {
             skip: this.currentPage*this.limitResults,
             limit: this.limitResults
           }});
