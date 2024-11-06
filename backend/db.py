@@ -1,5 +1,5 @@
 from neo4j import EagerResult, GraphDatabase, Record, Transaction, Driver, Result
-from models import PieceCreate, NodeCreate, SubNode, Log, QueryFilter, Filter
+from models import PieceCreate, NodeCreate, SubNode, Log, QueryFilter, Filter, NODES_RELATIONS
 from typing import Any
 import os
 
@@ -45,15 +45,27 @@ def pydict_to_neo(parameters: dict|None) -> str:
     return ', '.join(f'{key}: {val if type(val) is not str else f'"{val}"'}' for key, val in parameters.items())
 
 # creates query to connect each node to the main node
-def parse_subnodes(subnodes: list[SubNode], main_node_key: str):
-    return "\n".join(
-    [f"""WITH DISTINCT {main_node_key}
-        {f"optional MATCH ({main_node_key}) -[relation]- (:{n.node_label}) DELETE relation" if n.method in ['UPDATE', 'DELETE'] 
-         else ""} 
-        MERGE (k:{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) 
+def parse_subnode(n: SubNode, main_node_key: str, main_node_label: str):
+    relation_label = NODES_RELATIONS[(main_node_label, n.node_label)]
+    CREATE_QUERY = f"""MERGE (k:{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) 
         WITH DISTINCT {main_node_key}, k
         SET k += {{{pydict_to_neo(n.properties)}}}
-        CREATE ({main_node_key}) -[:{n.relation_label}]-> (k)""" for n in subnodes])
+        CREATE ({main_node_key}) -[:{relation_label}]-> (k)""" if n.node_id else ""
+    match n.method:
+        case 'CREATE':
+            return CREATE_QUERY
+        case 'UPDATE':
+            return f"optional MATCH ({main_node_key}) -[relation]- (:{n.node_label}) DELETE relation " + CREATE_QUERY
+        case 'DELETE':
+            return f"optional MATCH ({main_node_key}) -- (k :{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) DETACH DELETE k"
+        case 'DETACH':
+            f"optional MATCH ({main_node_key}) -[relation]- (k :{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) DELETE relation"
+
+
+def parse_subnodes(subnodes: list[SubNode], main_node_key: str, main_node_label: str):
+    return "\n".join(
+    [f"""WITH DISTINCT {main_node_key}
+        {parse_subnode(n, main_node_key, main_node_label)}""" for n in subnodes])
 
 def parse_operation(operation_str: str, key: str) -> str:
     match operation_str:
@@ -252,14 +264,14 @@ def create_update_component(piece_id: str, component_id: str | None, subnodes: l
             WITH c, f, $f_properties AS fProps 
             UNWIND fProps AS f_properties
             SET f += f_properties
-            """ + parse_subnodes(subnodes, "c") + "RETURN c"
+            """ + parse_subnodes(subnodes, "c", "componente") + "RETURN c"
     print(query)
     if tx:
         return tx.run(query, piece_id=piece_id, component_id=component_id, properties=properties, f_properties=fp)
     else:
         return run_query(query, piece_id=piece_id, component_id=component_id, properties=properties, f_properties=fp)
 
-def create_update_piece(piece_id: str, components: list[NodeCreate], subnodes: list[SubNode], properties: list[dict] ):
+def create_update_piece(piece_id: str|None, components: list[NodeCreate], subnodes: list[SubNode], properties: list[dict] ):
     """
     creates or update a piece if ``piece_id`` already exists, sets ``properties`` of piece and then creates or update each component
 
@@ -270,19 +282,23 @@ def create_update_piece(piece_id: str, components: list[NodeCreate], subnodes: l
     with GraphDatabase.driver(uri, auth=(username, password)) as driver:
         with driver.session() as session:
             with session.begin_transaction() as tx:
-                query = """
-                        MERGE (p :pieza {id: $nodeId})
+                if (piece_id):
+                    start_clause = "MATCH (p) WHERE elementid(p) = $nodeId"
+                else:
+                    start_clause = "CREATE (p :pieza)"
+                query = start_clause + """
                         WITH p, $properties AS mainProps
                         UNWIND mainProps as properties
                         SET p += properties
-                        """ + parse_subnodes(subnodes, "p") + " RETURN elementid(p), p"
-                print(query)
+                        """ + parse_subnodes(subnodes, "p", "pieza") + " RETURN elementid(p), p"
+                print(query, components)
                 result = tx.run(query, nodeId=piece_id, properties=properties).single().data()
                 piece_element_id = result['elementid(p)']
                 results.append(result)
                 for component in components:
-                    result = create_update_component(piece_element_id, component.id, component.connected_nodes, component.properties, tx)
-                    results.append(result.single().data())
+                    result = create_update_component(piece_element_id, component.id, component.connected_nodes, component.properties, tx).single()
+                    if result: # TODO: give error message when component update fails
+                        results.append(result.data())
                 tx.commit()
     return results
 
