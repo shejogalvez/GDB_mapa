@@ -9,13 +9,32 @@ import json
 #NodeLabel: labels de nodos válidos para hacer match al momento de hacer queries
 NodeLabel = Literal["pieza", "pais", "localidad", "exposicion", "cultura", "imagen", "componente", "forma", "ubicacion"]
 
+NODES_RELATIONS: dict[tuple[NodeLabel, NodeLabel], str] = {
+    ('pieza', 'pais'): 'de_pais',
+    ('pieza', 'cultura'): 'de_cultura',
+    ('pieza', 'localidad'): 'de_localidad',
+    ('pieza', 'componente'): 'compuesto_por',
+    ('pieza', 'exposicion'): 'expuesta_en',
+    ('pieza', 'imagen'): 'tiene_imagen',
+    ('componente', 'imagen'): 'tiene_imagen',
+    ('componente', 'forma'): 'tiene_forma',
+    ('componente', 'ubicacion'): 'ubicacion_componente',
+    ('ubicacion', 'ubicacion'): 'ubicacion_contiene',
+}
+
 class SubNode(BaseModel):
-    node_id: str
+    """Represents a node that is connected to a main node when creating/updating the main node, subnodes are represented by 
+    {node_id} which is the property with label {id_key}, depending on the method the action will be determinded:
+        - CREATE: Creates connection between subnode and main node, creates subnode if node_id noesn't exists and sets {properties}
+        - UPDATE: The same as CREATE but deletes all other connections that matches (main node) -> (:{node_label})
+        - DELETE: Deletes subnode if exists
+        - DETACH: Deletes conection with subnode if exists"""
+    node_id: Optional[str] = None 
     properties: Optional[dict[str, Any]] = None
-    relation_label: Optional[str] = None
+    #relation_label: Optional[str] = None
     node_label: Optional[NodeLabel] = None
     id_key: Optional[str] = None
-    method: Literal['DELETE', 'UPDATE', 'CREATE'] = 'UPDATE'
+    method: Literal['DELETE', 'UPDATE', 'CREATE', 'DETACH'] = 'UPDATE'
 
 class NodeCreate(BaseModel):
     id: Optional[str] = None
@@ -29,8 +48,6 @@ class NodeCreate(BaseModel):
             return cls(**json.loads(value))
         return value
 
-class NodeUpdate(NodeCreate):
-    node_id: str
 
 class PieceCreate(NodeCreate):
     components: list[NodeCreate]
