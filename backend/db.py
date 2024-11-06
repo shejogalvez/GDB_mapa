@@ -177,6 +177,53 @@ def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], s
     count = run_query(query_count, skip=skip, limit=limit, **query_kwargs)[0]
     return result, count
 
+def get_pieces_with_components_paginated(skip: int, limit: int):
+    pre_query= f"MATCH (pieza: pieza) {MATCH_RELATED_NODES}"
+    get_components_sub_query = """
+    CALL {
+        WITH *
+        MATCH (pieza) -[:compuesto_por]-> (componente:componente)
+        OPTIONAL MATCH (componente) -[]-> (forma:forma)
+        OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
+        OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
+        WITH componente, forma, ubicacion, collect(imagen) as imagenes
+        RETURN DISTINCT {id:elementid(componente), componente:componente, forma:forma, ubicacion:ubicacion, imagenes:imagenes} as componentes
+    }
+    """
+    post_query = f"RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}, componentes {skip_limit_clause(limit)}"
+    query = pre_query + get_components_sub_query + post_query
+    result = run_query(query, skip=skip, limit=limit)
+    query_count = "MATCH (pieza:pieza) RETURN count(*) as count"
+    count = run_query(query_count, skip=skip, limit=limit)[0]
+    return result, count
+
+def get_pieces_with_components_paginated_filtered(query_filters: dict[str, list[Filter]], skip: int, limit: int):
+
+    properties_filter_clauses, query_kwargs = parse_filters(query_filters)
+    print(properties_filter_clauses, query_kwargs)
+    match_nodes_statement = f"MATCH (pieza: pieza) {where_clause_from_label(properties_filter_clauses, "pieza")}"
+    for label in PIEZAS_RELATED_NODES:
+        match_nodes_statement += f"{match_clause_from_label(properties_filter_clauses, label)}"
+    get_components_sub_query = """
+    CALL {
+        WITH *
+        MATCH (pieza) -[:compuesto_por]-> (componente:componente)
+        OPTIONAL MATCH (componente) -[]-> (forma:forma)
+        OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
+        OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
+        WITH componente, forma, ubicacion, collect(imagen) as imagenes
+        RETURN DISTINCT {id:elementid(componente), componente:componente, forma:forma, ubicacion:ubicacion, imagenes:imagenes} as componentes
+    }
+    """
+    query= f"""
+    {match_nodes_statement} {get_components_sub_query}
+    RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}, componentes
+    {skip_limit_clause(limit)}"""
+    result = run_query(query, skip=skip, limit=limit, **query_kwargs)
+    query_count = match_nodes_statement + "RETURN count(*) as count"
+    count = run_query(query_count, skip=skip, limit=limit, **query_kwargs)[0]
+    return result, count
+
 def get_piece_components(piece_id):
     """ obtiene pieza con sus componentes y sus nodos relacionados
     Parameters
