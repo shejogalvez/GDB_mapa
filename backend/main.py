@@ -70,7 +70,7 @@ def attach_images_to_node(node_data: NodeCreate, images: List[UploadFile], prefi
     if not images: return
     for file in images:
         validate_file_size_type(file)
-        relative_path = f"{prefix}_{str(datetime.now())}"
+        relative_path = f"{prefix}_{str(datetime.now())}{file.filename}"
         upload_file(file, relative_path)
         file_properties = {"size" : file.size, "name" : file.filename}
         file_node = SubNode(node_id= relative_path, properties=file_properties, relation_label="tiene_imagen", node_label="imagen", id_key='filename', method='CREATE')
@@ -93,7 +93,7 @@ def delete_images(node_with_images: NodeCreate, tg: asyncio.TaskGroup):
         tg.create_task(os.remove(image.properties['filename']))
 
 def validate_file_size_type(file: IO):
-    FILE_SIZE = 2097152 # 2MB
+    FILE_SIZE = 8388608 # 8MB
 
     accepted_file_types = ["image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif", "image/heics", "png",
                           "jpeg", "jpg", "heic", "heif", "heics" 
@@ -268,3 +268,14 @@ async def update_piece(request: Request,
             delete_images(component, tg)
     
     return add_piece(request, node_create, user, images, component_images)
+
+@app.delete("/images/", dependencies=[Depends(get_write_permission_user)])
+async def delete_image(filename: str):
+    try:
+        path = os.path.join(UPLOAD_DIR, filename)
+        print(path)
+        db.delete_image_by_filename(filename)
+        os.remove(path)
+    except OSError:
+        return HTTPException(status_code=404, detail=f"image to delete was not found")
+    

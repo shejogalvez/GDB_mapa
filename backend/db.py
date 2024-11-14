@@ -379,6 +379,14 @@ def delete_user(username: str):
             """
     return run_query(query, username=username)
 
+def delete_image_by_filename(filename: str):
+    query = """
+            MATCH (n: imagen {filename: $filename})
+            DETACH DELETE n
+            """
+    print(query, filename)
+    return run_query(query, filename=filename)
+
 def create_log(log: Log):
     """creates a log connection between"""
     query = """

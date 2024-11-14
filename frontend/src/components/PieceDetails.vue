@@ -5,8 +5,8 @@
       <div class="user-details-card">
         <h1>Info pieza</h1>
         <!-- User Image -->
-        <div v-for="img in piece.previewImages" class="user-image">
-          <img :src="img" alt="Imagen pieza" />
+        <div v-for="(img, index) in piece.imagenes" class="user-image">
+          <DeletableImage @imageDeleted="() => piece.imagenes.splice(index)" :imageUrl="img.content" :imageId="img.filename">pieza imagen</DeletableImage>
         </div>
         
         <!-- User Information -->
@@ -23,10 +23,10 @@
         </div>
 
         <h1>Info componentes</h1>
-        <div v-for="component in piece.components" class="user-info">
-          <h3>{{ component.id }}</h3>
-          <div class="user-image">
-            <img v-for="img in component.previewImages" :src="img" alt="Imagen componente" />
+        <div v-for="(component, index) in piece.components" class="user-info">
+          <h3>componente {{ index+1 }}</h3>
+          <div v-for="(img, index) in piece.imagenes" class="user-image">
+            <DeletableImage @imageDeleted="() => component.imagenes.splice(index)" :imageUrl="img.content" :imageId="img.filename">pieza imagen</DeletableImage>
           </div>
           <template v-for="(val, key, idx) in component.properties">
             <p><strong>{{ key }}:</strong> {{ val }} </p>
@@ -41,6 +41,7 @@
   <script>
   import axios from 'axios';
   import { useStore } from '@/stores/store';
+  import DeletableImage from './DeletableImage.vue';
   
   export default {
     data() {
@@ -49,6 +50,9 @@
         piece: {},
         showModal: false,
       };
+    },
+    components: {
+      DeletableImage
     },
     async beforeCreate() {
       const pieceId = this.$route.params.id;  // Get user ID from the route
@@ -115,9 +119,10 @@
         .then(async res => {
           const reader = new FileReader();
           reader.onload = (e) => {
-            parent_object.previewImages.push(e.target.result);
+            img_node.content = (e.target.result);
           };
           reader.readAsDataURL(res.data);
+          console.log(this.piece.imagenes);
         })
       },
       openModal() {
