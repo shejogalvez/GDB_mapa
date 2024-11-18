@@ -1,12 +1,23 @@
 <template>
-    <div :class="fixed">
-      <h1>Piezas</h1>
-
-      <button @click="openModal" class="modern-button">crear pieza</button>
+    <v-app :class="fixed">
+      
+      <v-app-bar :elevation="2">
+        <v-app-bar-title>Piezas</v-app-bar-title>
+        <template v-slot:append>
+          <button @click="openModal" class="modern-button">crear pieza</button>
+          
+          <v-tooltip text="Exportar vista a excel">
+            <template v-slot:activator="{ props }">
+              <v-btn v-bind="props" icon="mdi-download" @click="downloadCsv"></v-btn>
+            </template>
+          </v-tooltip>
+        </template>
+      </v-app-bar>
+      
       <FormModal :isVisible="showModal" @close="closeModal" />
       
       <!-- Filter Input -->
-  
+      <br><br>
       <!-- Data Table -->
       <table >
         <thead>
@@ -75,7 +86,7 @@
       <button :disabled="currentPage === totalPages" @click="changePage(this.currentPage + 1)">Next</button>
       <button :disabled="currentPage === totalPages" @click="changePage(this.totalPages)">Last</button>
     </div>
-    </div>
+    </v-app>
   </template>
   
   <script>
@@ -163,6 +174,25 @@
 
       closeModal() {
         this.showModal = false;  // Close the modal
+      },
+      async downloadCsv() {
+        const filters = useFilterStore().$state.filters;
+        try {
+          const response = await axios.post('http://localhost:8000/csv/', filters, {
+            responseType: 'blob'
+          });
+          console.log(response.data);
+          const url = window.URL.createObjectURL(new Blob([response.data]));
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', 'export.xlsx');
+          document.body.appendChild(link);
+          link.click();
+        }
+        catch (e){
+          console.error(e);
+          alert("error exporting file");
+        }
       }
 
     },
@@ -250,6 +280,7 @@
     font-weight: 600;
     box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
     transition: background-color 0.3s ease, transform 0.2s ease;
+    margin-right: 10pt;
   }
   
   .modern-button:hover {
