@@ -29,7 +29,7 @@ def parse_labels(labels: list[str]) -> str:
     return f":{' :'.join(labels)} " if labels else ""
 
 def _get_forma_properties(properties: dict[str, str]) -> dict[str, str]: # TODO: mover esto al backend(?)
-    FORMA_KEYS = ["alto", "ancho", "profundidad", "peso"]
+    FORMA_KEYS = ["alto", "ancho", "largo", "diametro", "peso", "forma"]
     forma_properties = {}
     to_delete = []
     for key, val in properties.items():
