@@ -11,14 +11,17 @@ username, password = os.getenv("NEO4J_AUTH").split('/')  # Your Neo4j username
 def _get_data_only(result: Result):
     return result.data()
 
+def _get_dataframe(result: Result):
+    return result.to_df(expand=True)
+
 # returns instance of driver to be used on backend
 def get_db_driver() -> Driver:
     return GraphDatabase.driver(uri, auth=(username, password))
 
 # Initialize the driver
-def run_query(query: str, database_="neo4j", **kwarws) -> EagerResult:
+def run_query(query: str, database_="neo4j", result_transformer = _get_data_only, **kwarws) -> EagerResult:
     with GraphDatabase.driver(uri, auth=(username, password)) as driver:
-        return driver.execute_query(query, kwarws, database_=database_, result_transformer_=_get_data_only)
+        return driver.execute_query(query, kwarws, database_=database_, result_transformer_=result_transformer)
 
 ## UTILS ##
 # Parse dict and returns str to match properties in cypher query
@@ -212,12 +215,12 @@ def get_pieces_with_components_paginated_filtered(query_filters: dict[str, list[
         OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
         OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
         WITH componente, forma, ubicacion, collect(imagen) as imagenes
-        RETURN DISTINCT {id:elementid(componente), componente:componente, forma:forma, ubicacion:ubicacion, imagenes:imagenes} as componentes
+        RETURN DISTINCT {componente:componente, forma:forma, ubicacion:ubicacion, imagenes:imagenes} as componentes
     }
     """
     query= f"""
     {match_nodes_statement} {get_components_sub_query}
-    RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}, componentes
+    RETURN pieza, {RETURN_RELATED_NODES}, componentes
     {skip_limit_clause(limit)}"""
     result = run_query(query, skip=skip, limit=limit, **query_kwargs)
     query_count = match_nodes_statement + "RETURN count(*) as count"
@@ -298,7 +301,9 @@ def create_update_component(piece_id: str, component_id: str | None, subnodes: l
     
     connections are passed ass a list of SubNodes where you indicate a property to match, also properties
     of connected nodes can be updated"""
+    print(properties)
     fp: dict = _get_forma_properties(properties)
+    print(fp, properties)
     if (component_id):
         clause = "MATCH (c :componente)<-[:compuesto_por]-(p) WHERE elementid(c) = $component_id"
     else:

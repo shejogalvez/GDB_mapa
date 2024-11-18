@@ -1,7 +1,7 @@
 from typing import Annotated, Optional, List, Literal, IO
 from fastapi import FastAPI, Query, Depends, Body, File, Form, UploadFile, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from contextlib import asynccontextmanager
 from neo4j.exceptions import ConstraintError
 import shutil
@@ -12,6 +12,9 @@ from pathlib import Path
 import asyncio
 import filetype
 from datetime import datetime
+import io
+import pandas as pd
+import numpy as np
 
 import db
 import user
@@ -278,4 +281,28 @@ async def delete_image(filename: str):
         os.remove(path)
     except OSError:
         return HTTPException(status_code=404, detail=f"image to delete was not found")
-    
+
+@app.post("/csv/", dependencies=[Depends(get_read_permission_user)])
+def get_filtered_data_csv(query_filters: dict[NodeLabel, list[Filter]]):
+    data, _ = db.get_pieces_with_components_paginated_filtered(query_filters, 0, -1)
+    df = pd.json_normalize(data, sep="_")
+    # # Set order in which excel df columns will be presented
+    # desired_order = []
+    # for col in desired_order:
+    #     if col not in df.columns:
+    #         df[col] = np.nan  # Add missing columns with NaN values
+
+    # # Rearrange the DataFrame columns to match the desired order
+    # df = df[desired_order]
+
+    #print(df)
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer) as writer:
+        df.to_excel(writer, index=False)
+        
+    response = StreamingResponse(iter([buffer.getvalue()]),
+                                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
+    response.headers["Content-Disposition"] = "attachment; filename=export.xlsx"
+    return response
+
