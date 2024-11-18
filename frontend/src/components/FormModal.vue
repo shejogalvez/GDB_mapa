@@ -104,6 +104,8 @@
                             :items="['MUY BUENO', 'BUENO', 'REGULAR', 'MALO', 'MUY MALO']">
                             </v-select>
                             
+                            <FormaForm :component_index="i"></FormaForm>
+
                             <label for="ubicacion">Seleccionar ubicacion:</label>
                             <TreeDropdown
                             :options = "ubicaciones_data"
@@ -144,6 +146,7 @@ import TreeDropdown from './TreeDropdown.vue'
 import { VDateInput } from 'vuetify/labs/VDateInput'
 import { useStore } from '@/stores/store';
 import ConfirmAction from './ConfirmAction.vue';
+import FormaForm from './FormaForm.vue';
 
 
 export default {
@@ -157,6 +160,7 @@ export default {
       TreeDropdown,
       VDateInput,
       ConfirmAction,
+      FormaForm,
     },
     data() {
         /** @typedef {object} Ubicacion
