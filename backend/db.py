@@ -141,7 +141,7 @@ def get_nodes_as_tree(labels: list[str], relation_label: str, root_val: Any = "r
     result = run_query(query, root=root_val)
     return result
 
-PIEZAS_RELATED_NODES = ["pais", "localidad", "exposicion", "cultura", "imagen"]
+PIEZAS_RELATED_NODES = ["pais", "localidad", "exposicion", "cultura"]
 MATCH_RELATED_NODES = "\n".join(f"OPTIONAL MATCH (pieza) --> ({label}:{label})" for label in PIEZAS_RELATED_NODES)
 RETURN_RELATED_NODES = ",".join(PIEZAS_RELATED_NODES)
 
@@ -253,6 +253,7 @@ def get_piece_by_elementid(piece_id, tx:Transaction=None):
     query = f"""
     MATCH (pieza) WHERE elementid(pieza) = $piece_id
     {MATCH_RELATED_NODES}
+    OPTIONAL MATCH (pieza) -[]-> (imagen:imagen)
     WITH pieza, pais, localidad, exposicion, cultura, collect(imagen) as imagenes
     RETURN DISTINCT elementid(pieza) as id, pieza, pais, localidad, exposicion, cultura, imagenes"""
     if tx:
