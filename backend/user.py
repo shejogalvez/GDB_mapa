@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from passlib.pwd import genword
-from models import User, UserInDB, RoleEnum
+from models import User, UserInDB, RoleEnum, UserForm
 from typing import List, Optional, Annotated
 from jose import jwt, JWTError
 from datetime import timedelta, datetime
@@ -17,24 +17,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2 scheme for token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-# In-memory database (for simplicity) TODO: delete and connect to actual database
-users_db = {
-    "user1": {
-        "username": "user1",
-        "full_name": "User One",
-        "email": "user1@example.com",
-        "hashed_password": pwd_context.hash("password1"),
-        "role": "reader"  # Can be 'reader' or 'writer'
-    },
-    "admin": {
-        "username": "admin",
-        "full_name": "Admin User",
-        "email": "admin@example.com",
-        "hashed_password": pwd_context.hash("adminpassword"),
-        "role": "admin"  # Can read and write
-    }
-}
 
 # Helper functions to authenticate and verify users
 def verify_password(plain_password, hashed_password):
@@ -108,15 +90,15 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token = enconde_token({"username": user.username}, expires_delta= timedelta(minutes=120))
+    token = enconde_token({"username": user.username}, expires_delta= timedelta(minutes=300))
     return {"access_token": token, "token_type": "bearer"}
 
 @router.post("/user", dependencies=[Depends(get_admin_permission_user)])
-async def add_user(username: Annotated[str, Form()], password: Annotated[str, Form()], role: Annotated[RoleEnum, Form()]):
+async def add_user(user: Annotated[UserForm, Form()]):
     salt = genword(length=15, charset="ascii_72")
-    hashed_password = pwd_context.hash(password + salt)
-    db.create_user(username, hashed_password, salt, role.value)
-    return {"username": username}
+    hashed_password = pwd_context.hash(user.password + salt)
+    db.create_user(user.username, hashed_password, salt, user.role.value)
+    return {"username": user.username}
 
 ## TEST ROUTES
 # Open route, anyone can access

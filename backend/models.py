@@ -9,6 +9,7 @@ import json
 #NodeLabel: labels de nodos válidos para hacer match al momento de hacer queries
 NodeLabel = Literal["pieza", "pais", "localidad", "exposicion", "cultura", "imagen", "componente", "forma", "ubicacion"]
 
+# NODES_RELATIONS: diccionario para asignar labels de relaciones entre tipos de nodo
 NODES_RELATIONS: dict[tuple[NodeLabel, NodeLabel], str] = {
     ('pieza', 'pais'): 'de_pais',
     ('pieza', 'cultura'): 'de_cultura',
@@ -69,6 +70,9 @@ class User(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     role: RoleEnum
+
+class UserForm(User):
+    password: str
 
 class UserInDB(User):
     hashed_password: str
