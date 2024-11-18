@@ -2,7 +2,7 @@
     <v-card class="image-card" width="200">
       <!-- Image Thumbnail -->
       <v-img
-        :src="imageUrl"
+        :src="imgData"
         class="clickable-image"
         aspect-ratio="1"
         @click="showFullImage"
@@ -18,9 +18,9 @@
       </v-img>
   
       <!-- Full-Size Image Modal -->
-      <v-dialog v-model="isModalOpen" max-width="800">
+      <v-dialog v-model="isModalOpen" max-width="1360">
         <v-card>
-          <v-img :src="imageUrl" class="full-size-image" />
+          <v-img :src="imgData" class="full-size-image" />
         </v-card>
       </v-dialog>
     </v-card>
@@ -34,10 +34,6 @@
     name: "ImageComponent",
     emits: ['imageDeleted'],
     props: {
-      imageUrl: {
-        type: String,
-        required: true,
-      },
       imageId: {
         type: String,
         required: true,
@@ -63,11 +59,24 @@
           alert("error eliminando imagen")
         }
       };
+
+      const imgData = ref("");
+      // get image data from backend
+      
+        axios.get(`http://localhost:8000/get-image/`, {params: {image_url: props.imageId}, responseType: 'blob'},)
+        .then(async res => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            imgData.value = (e.target.result);
+          };
+          reader.readAsDataURL(res.data);
+        })
   
       return {
         isModalOpen,
         showFullImage,
         deleteImage,
+        imgData,
       };
     },
   };

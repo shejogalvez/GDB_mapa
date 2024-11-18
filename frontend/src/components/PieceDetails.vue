@@ -6,7 +6,7 @@
         <h1>Info pieza</h1>
         <!-- User Image -->
         <div v-for="(img, index) in piece.imagenes" class="user-image">
-          <DeletableImage @imageDeleted="() => piece.imagenes.splice(index)" :imageUrl="img.content" :imageId="img.filename">pieza imagen</DeletableImage>
+          <DeletableImage @imageDeleted="() => piece.imagenes.splice(index)" :imageId="img.filename">pieza imagen</DeletableImage>
         </div>
         
         <!-- User Information -->
@@ -25,13 +25,14 @@
         <h1>Info componentes</h1>
         <div v-for="(component, index) in piece.components" class="user-info">
           <h3>componente {{ index+1 }}</h3>
-          <div v-for="(img, index) in piece.imagenes" class="user-image">
-            <DeletableImage @imageDeleted="() => component.imagenes.splice(index)" :imageUrl="img.content" :imageId="img.filename">pieza imagen</DeletableImage>
+          <div v-for="(img, index) in component.imagenes" class="user-image">
+            <DeletableImage @imageDeleted="() => component.imagenes.splice(index)" :imageId="img.filename">pieza imagen</DeletableImage>
           </div>
           <template v-for="(val, key, idx) in component.properties">
             <p><strong>{{ key }}:</strong> {{ val }} </p>
           </template>
-            <p v-if="component.ubicacion"><strong>ubicacion:</strong> {{ component.ubicacion.name }} </p>
+          <p v-if="component.ubicacion"><strong>ubicacion:</strong> {{ component.ubicacion.name }} </p>
+          <p v-if="component.forma"><strong>dimensiones:</strong> {{ component.forma }} </p>
             <br><br>
         </div>
       </div>
@@ -54,7 +55,7 @@
     components: {
       DeletableImage
     },
-    async beforeCreate() {
+    async mounted() {
       const pieceId = this.$route.params.id;  // Get user ID from the route
       try {
         const response = await axios.get(`http://localhost:8000/components/`, {params: {
@@ -91,17 +92,9 @@
           component.uploadedFiles = [];
           component.previewImages = [];
         }
-        for (const img of pieceData.imagenes) {
-          this.setImageData(img, pieceData);
-        }
-        for (const component of this.components) {
-          for (const img of component.imagenes) {
-            this.setImageData(img, componentsData);
-          }
-        }
         pieceData.components = componentsData;
         
-        useStore().$state.currentPiece = pieceData;
+        useStore().$patch({currentPiece: pieceData});
         this.piece = pieceData
         console.log(this.piece);
       } catch (error) {
@@ -113,20 +106,7 @@
       // Fetch user details from the backend using an ID
       async fetchDetails() {
       },
-      setImageData(img_node, parent_object) {
-        console.log(img_node);
-        axios.get(`http://localhost:8000/get-image/`, {params: {image_url: img_node.filename}, responseType: 'blob'},)
-        .then(async res => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            img_node.content = (e.target.result);
-          };
-          reader.readAsDataURL(res.data);
-          console.log(this.piece.imagenes);
-        })
-      },
       openModal() {
-        console.log(useStore().$state.currentPiece)
         this.showModal = true
       },
       closeModal() {
