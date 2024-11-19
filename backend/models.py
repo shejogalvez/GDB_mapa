@@ -35,7 +35,7 @@ class SubNode(BaseModel):
     #relation_label: Optional[str] = None
     node_label: Optional[NodeLabel] = None
     id_key: Optional[str] = None
-    method: Literal['DELETE', 'UPDATE', 'CREATE', 'DETACH'] = 'UPDATE'
+    method: Literal['DELETE', 'UPDATE', 'CREATE', 'DETACH', 'MERGE'] = 'UPDATE'
 
 class NodeCreate(BaseModel):
     id: Optional[str] = None

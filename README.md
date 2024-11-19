@@ -4,6 +4,7 @@
 ## Requisitos
 
 - Docker
+- Python + pandas
 
 ### Librerías y Frameworks
 
@@ -19,6 +20,12 @@ Backend:
 - [Neo4j python driver](https://neo4j.com/docs/api/python-driver/current/api.html#driver)
 - [python-jose](https://python-jose.readthedocs.io/en/latest/)
 - [pytest](https://docs.pytest.org/)
+
+## Poblar la BDD
+
+se debe ubicar en la carpeta base del proyecto GDB_MAPA, tener listo el archivo excel que se quiere utilizar y correr el comando
+`python excel_to_neo4j_csv.py {ruta_del_archvo_xlsx} ; docker exec backend python db.py` 
+python excel_to_neo4j_csv.py "2024 Inventario Colecciones MAPA-PCMAPA (1).xlsx" ; docker exec backend python db.py
 
 ## Correr la aplicación
 

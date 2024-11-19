@@ -45,12 +45,14 @@ def _get_forma_properties(properties: dict[str, str]) -> dict[str, str]: # TODO:
 
 def pydict_to_neo(parameters: dict|None) -> str:
     if (not parameters): return ""
+    parameters = dict(filter(lambda pair: pair[1]!=None, parameters.items())) # filter None Values
     return ', '.join(f'{key}: {val if type(val) is not str else f'"{val}"'}' for key, val in parameters.items())
 
 # creates query to connect each node to the main node
 def parse_subnode(n: SubNode, main_node_key: str, main_node_label: str):
     relation_label = NODES_RELATIONS[(main_node_label, n.node_label)]
-    CREATE_QUERY = f"""MERGE (k:{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) 
+    KEY_MATCH_CLAUSE =  f"{{{n.id_key}: \"{n.node_id}\"}}" if n.id_key else ""
+    CREATE_QUERY = f"""MERGE (k:{n.node_label} {KEY_MATCH_CLAUSE}) 
         WITH DISTINCT {main_node_key}, k
         SET k += {{{pydict_to_neo(n.properties)}}}
         CREATE ({main_node_key}) -[:{relation_label}]-> (k)""" if n.node_id else ""
@@ -59,6 +61,9 @@ def parse_subnode(n: SubNode, main_node_key: str, main_node_label: str):
             return CREATE_QUERY
         case 'UPDATE':
             return f"optional MATCH ({main_node_key}) -[relation]- (:{n.node_label}) DELETE relation " + CREATE_QUERY
+        case 'MERGE':
+            return f"""MERGE ({main_node_key}) -[:{relation_label}]-> (k:{n.node_label} {KEY_MATCH_CLAUSE})
+            SET k += {{{pydict_to_neo(n.properties)}}}"""
         case 'DELETE':
             return f"optional MATCH ({main_node_key}) -- (k :{n.node_label} {{{n.id_key}: \"{n.node_id}\"}}) DETACH DELETE k"
         case 'DETACH':
@@ -301,9 +306,6 @@ def create_update_component(piece_id: str, component_id: str | None, subnodes: l
     
     connections are passed ass a list of SubNodes where you indicate a property to match, also properties
     of connected nodes can be updated"""
-    print(properties)
-    fp: dict = _get_forma_properties(properties)
-    print(fp, properties)
     if (component_id):
         clause = "MATCH (c :componente)<-[:compuesto_por]-(p) WHERE elementid(c) = $component_id"
     else:
@@ -315,15 +317,12 @@ def create_update_component(piece_id: str, component_id: str | None, subnodes: l
             WITH *, $properties AS mainProps
             UNWIND mainProps AS properties
             SET c += properties
-            WITH c, f, $f_properties AS fProps 
-            UNWIND fProps AS f_properties
-            SET f += f_properties
             """ + parse_subnodes(subnodes, "c", "componente") + "RETURN c"
     print(query)
     if tx:
-        return tx.run(query, piece_id=piece_id, component_id=component_id, properties=properties, f_properties=fp)
+        return tx.run(query, piece_id=piece_id, component_id=component_id, properties=properties)
     else:
-        return run_query(query, piece_id=piece_id, component_id=component_id, properties=properties, f_properties=fp)
+        return run_query(query, piece_id=piece_id, component_id=component_id, properties=properties)
 
 def create_update_piece(piece_id: str|None, components: list[NodeCreate], subnodes: list[SubNode], properties: list[dict] ):
     """
