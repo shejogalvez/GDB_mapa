@@ -23,36 +23,19 @@
         <thead>
           <tr>
             <th>Select</th>
-            <FilterTH @applyFilter="filterRows" header_text="Numero de Inventario" property_label="id"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Número de registro anterior" property_label="numero_de registro_anterior"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Coleccion" property_label="coleccion"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="SURDOC" property_label="SURDOC"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Clasificacion" property_label="clasificacion"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Conjunto" property_label="conjunto"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Autor" property_label="autor"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Fecha de Creacion" property_label="fecha_de_creacion"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Contexto Historico" property_label="contexto_historico"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Notas de Investigacion" property_label="notas_investigacion"></FilterTH>
+            <FilterTH v-for="(val, key) in property_columns" @applyFilter="filterRows" :header_text="val" :property_label="key"></FilterTH>
+
             <FilterTH @applyFilter="filterRows" header_text="Pais" property_label="name" node_label="pais"></FilterTH>
             <FilterTH @applyFilter="filterRows" header_text="Localidad" property_label="name" node_label="localidad"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Afiliacion Cultural" property_label="name" node_label="cultura"></FilterTH>
-            <FilterTH @applyFilter="filterRows" header_text="Fecha de Creacion" property_label=""></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="Afiliacion Cultural" property_label="name" node_label="cultura"></FilterTH>  
             <FilterTH @applyFilter="filterRows" header_text="exposiciones" property_label="name" node_label="pais"></FilterTH>
           </tr>
         </thead>
         <tbody>
           <tr v-for="row in filteredRows" :key="row.pieza.id">
             <td><button class="modern-button" @click="goToDetails(row)"> </button> </td>
-            <td>{{ row.pieza.id }}</td>
-            <td>{{ row.pieza["numero_de registro_anterior"] }}</td>
-            <td>{{ row.pieza.coleccion }}</td>
-            <td>{{ row.pieza.SURDOC }}</td>
-            <td>{{ row.pieza.clasificacion }}</td>
-            <td>{{ row.pieza.conjunto }}</td>
-            <td>{{ row.pieza.autor }}</td>
-            <td>{{ row.pieza.fecha_de_creacion }}</td>
-            <td>{{ row.pieza.contexto_historico }}</td>
-            <td>{{ row.pieza.notas_investigacion }}</td>
+            <td v-for="(val, key) in property_columns">{{ row.pieza[key] }}</td>
+
             <td>{{ row.pais?.name }}</td>
             <td>{{ row.localidad?.name }}</td>
             <td>{{ row.cultura?.name }}</td>
@@ -104,11 +87,27 @@
       return {
         rows: [],
         filteredRows: [],
-        filterText: "",
         showModal: false,
         currentPage: 0,
         limitResults: 75,
         totalPages: 50,
+        property_columns: {
+          id: "Numero de Inventario",
+          numero_de_registro_anterior :"Número de registro anterior",
+          coleccion :"Coleccion",
+          clasificacion :"SURDOC",
+          conjunto :"Clasificacion",
+          autor :"Conjunto",
+          fecha_de_creacion :"Autor",
+          contexto_historico :"Fecha de Creación",
+          notas_investigacion :"Contexto Historico",
+          bibliografia :"Notas de Investigacion",
+          avaluo :"Bibliografia",
+          procedencia :"Avaluo",
+          donante :"Procedencia",
+          fecha_ingreso :"Donante",
+          fecha_ingreso_text :"Fecha ingreso"
+        }
       };
     },
     methods: {

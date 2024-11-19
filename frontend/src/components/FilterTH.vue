@@ -1,4 +1,5 @@
 <template>
+    
     <th>{{header_text}} <v-btn
         @click = "openMenu"
         class="ma-2"
@@ -9,25 +10,17 @@
       
       <div v-if="isOpen" class="filter-menu">
         <!-- Select Comparison Option -->
-        <label>
-            Comparison:
-            <select :disabled="isFilterApplied" v-model="operation">
-                <option value="=">Equals</option>
-                <option value="contains">Contains</option>
-                <option value="<">Is Less Than</option>
-                <option value=">">Is Greater Than</option>
-            </select>
-        </label>
+        <v-select label="Comparison" :disabled="isFilterApplied" v-model="operation" density="compact" variant="outlined"
+            :items="['=', 'contains', '<', '>']">
+        </v-select>
         
         <!-- Text Input -->
-        <label>
-            Value:
-            <input :disabled="isFilterApplied" type="text" v-model="val" />
-        </label>
+        <v-text-field label="Value" :disabled="isFilterApplied" v-model="val" density="compact" variant="outlined"/>
         
         <!-- Apply Filters Button -->
         <v-btn @click="applyFilters">{{isFilterApplied ? 'Remove Filters': 'Apply Filters' }}</v-btn>
-      </div></th>
+      </div>
+    </th>
 </template>
 
 <script>
@@ -106,6 +99,7 @@ th {
     height: 150pt;
     display: grid;
     background-color: white;
+    padding: 15pt 15pt 0pt 15pt ;
     z-index: 2;
 }
 .filter-menu label {
