@@ -19,7 +19,7 @@ import numpy as np
 import db
 import user
 from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user, get_current_user, add_user
-from models import PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum, NodeLabel
+from models import PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum, NodeLabel, UserForm
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,9 +27,12 @@ async def lifespan(app: FastAPI):
     admin_users = db.get_all_nodes_property_filter("user", [Filter(key="role", operation= "=", val="admin")])   
     if (not admin_users):
         # else create admin user from .env credentials
-        username = os.getenv("ADMIN_USER", "admin")
-        password = os.getenv("ADMIN_PASSWORD", "admin")
-        await add_user(username=username, password=password, role=RoleEnum.admin)
+        user = UserForm(
+            username=os.getenv("ADMIN_USER", "admin"), 
+            password=os.getenv("ADMIN_PASSWORD", "admin"), 
+            role=RoleEnum.admin
+        )
+        await add_user(user)
     else:
         print("superuser already exists")
     yield
