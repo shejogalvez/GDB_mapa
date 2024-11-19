@@ -45,25 +45,25 @@
                         
                         <v-combobox 
                             label="pais" 
-                            :items="paises_data.map(o => o.properties.name)"
+                            :items="paises_data?.map(o => o.properties.name)"
                             v-model="pieceData.connected_nodes.pais"
                         ></v-combobox>
 
                         <v-combobox 
                             label="localidad" 
-                            :items="localidades_data.map(o => o.properties.name)"
+                            :items="localidades_data?.map(o => o.properties.name)"
                             v-model="pieceData.connected_nodes.localidad"
                         ></v-combobox>
                         
                         <v-combobox 
                             label="cultura" 
-                            :items="culturas_data.map(o => o.properties.name)"
+                            :items="culturas_data?.map(o => o.properties.name)"
                             v-model="pieceData.connected_nodes.cultura"
                         ></v-combobox>
                         
                         <v-combobox 
                             label="exposición" 
-                            :items="exposiciones_data.map(o => o.properties.name)"
+                            :items="exposiciones_data?.map(o => o.properties.name)"
                             v-model="pieceData.connected_nodes.exposicion"
                         ></v-combobox>
                         
@@ -116,6 +116,7 @@
                             <TreeDropdown
                             :options = "ubicaciones_data"
                             :children_key = "'ubicacion_contiene'"
+                            :default="component.connected_nodes.ubicacion"
                             @input="(ubicacion) => component.connected_nodes.ubicacion = ubicacion"
                             >
                             </TreeDropdown>
@@ -197,6 +198,11 @@ export default {
                     return 'Campo no puede estar vacio.'
                 },
              ],
+             ubicaciones_data: [],
+             paises_data: [],
+             localidades_data: [],
+             culturas_data: [],
+             exposiciones_data: [],
         };
     },
     mounted() {
@@ -209,7 +215,7 @@ export default {
                 axios.get('http://localhost:8000/nodes/tree/', {params: {
                     labels: 'ubicacion',
                     rel_label: 'ubicacion_contiene'
-                }}).then(response => {this.ubicaciones_data = response.data[0]['value']['ubicacion_contiene']; console.log(this.ubicaciones_data);  })
+                }}).then(response => {this.ubicaciones_data = response.data[0]['value']['ubicacion_contiene']})
                 axios.get('http://localhost:8000/nodes/', {params: {
                     labels: 'pais'
                 }}).then(response => {this.paises_data = response.data})
