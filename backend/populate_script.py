@@ -1,3 +1,6 @@
+from db import get_db_driver
+
+queries = """
 CREATE CONSTRAINT pieza_pk IF NOT EXISTS FOR (n:piezas) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT componente_pk IF NOT EXISTS FOR (n:componente) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT user_pk IF NOT EXISTS FOR (n:user) REQUIRE n.username IS UNIQUE;
@@ -5,7 +8,7 @@ CREATE CONSTRAINT pais_pk IF NOT EXISTS FOR (n:pais) REQUIRE n.name IS UNIQUE;
 CREATE CONSTRAINT localidad_pk IF NOT EXISTS FOR (n:localidad) REQUIRE n.name IS UNIQUE;
 
 LOAD CSV WITH HEADERS FROM 'file:///pais.csv' AS row
-MERGE (:pais {id: row.pais_id, name: row.pais});
+MERGE (:pais {name: row.pais});
 
 LOAD CSV WITH HEADERS FROM 'file:///localidad.csv' AS row
 MERGE (:localidad {name: row.localidad});
@@ -61,16 +64,13 @@ MATCH (pieza:pieza {id: row.numero_de_inventario})
 CREATE (pieza)-[:compuesto_por ]->(n);
     
 LOAD CSV WITH HEADERS FROM 'file:///forma.csv' AS row
-WITH row, SPLIT(row.labels, ',') AS labeles
-CALL {
-    WITH row, labeles
-    MERGE (a: forma {id: row.id})
-    SET a.labels = labeles[1], a.alto = toFloat(row.alto_cm), a.ancho = toFloat(row.ancho_cm), a.profundidad = toFloat(row.profundidad_cm), a.diametro = toFloat(row.diametro_cm)
-    RETURN a
-}
-WITH a, row
 MATCH (b:componente {id: row.id_componente})
-CREATE (a)<-[:tiene_forma]-(b);
+MERGE (b)-[:tiene_forma]->(a:forma)
+SET a.forma = row.forma,
+    a.alto = toFloat(row.alto_cm),
+    a.ancho = toFloat(row.ancho_cm),
+    a.profundidad = toFloat(row.profundidad_cm),
+    a.diametro = toFloat(row.diametro_cm);
 
 LOAD CSV WITH HEADERS FROM 'file:///ubicaciones.csv' AS row
 CREATE (:ubicacion {id: row.id, name: row.name, label: row.label});
@@ -81,4 +81,13 @@ CREATE (a)-[:ubicacion_componente ]->(b);
 
 LOAD CSV WITH HEADERS FROM 'file:///ubicaciones_rel.csv' AS row
 MATCH (a:ubicacion {id: row.id_contenedor}), (b:ubicacion {id: row.id_contenido})
-CREATE (a)-[:ubicacion_contiene ]->(b);
+CREATE (a)-[:ubicacion_contiene ]->(b);"""
+
+queries = queries.split(";\n")
+
+with get_db_driver() as driver:
+    for query in queries:
+            _, summary, _ = driver.execute_query(query, database_="neo4j")
+            print(f"{summary.query} completed in {summary.result_available_after} ms")
+
+print("data imported to neo4j")

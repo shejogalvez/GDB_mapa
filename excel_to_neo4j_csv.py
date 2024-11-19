@@ -1,9 +1,7 @@
 import pandas as pd
 import os
 import sys
-from neo4j import GraphDatabase
 from pydantic import BaseModel, Field
-from typing import Literal, Type
 from uuid import UUID, uuid4
 
 # Set up the connection details
@@ -160,7 +158,7 @@ def main(WB_PATH):
         for col_name in nombres_columnas_ubicacion:
             col_val = row[col_name]
             if pd.isna(col_val): continue
-            print(f"{col_name}{index}: {col_val}")
+            #print(f"{col_name}{index}: {col_val}")
             if col_val not in current_node.children:
                 new_ubicacion = Ubicacion(label=col_name, name=str(col_val))
                 current_node.children[new_ubicacion.name] = new_ubicacion
@@ -169,7 +167,7 @@ def main(WB_PATH):
             current_node = new_ubicacion
         # componente se conecta a la ultima ubicación sobre la que se pasó/creó en el arbol 
         if new_ubicacion:
-            print(new_ubicacion)
+            #print(new_ubicacion)
             componenteId_ubicacion.append({'id_componente': row['component_id'], 'id_ubicacion': new_ubicacion.id})
 
     ubicacion_df_list = []
@@ -219,13 +217,12 @@ def main(WB_PATH):
                 case _:
                     continue
         atributos = list(row[ATRIBUTOS_FORMAS])
-        self_id = f"F{index}"
-        atributos.extend([self_id, get_row_component_id(row), f"forma,{forma}"])
+        atributos.extend([get_row_component_id(row), forma])
         formas_propiedades.append(atributos)
 
     # export formas info
     dataframe_to_csv(pd.DataFrame(list(formas_propiedades), 
-                                    columns=ATRIBUTOS_FORMAS + ['id', 'id_componente','labels']), 
+                                    columns=ATRIBUTOS_FORMAS + ['id_componente','forma']), 
                                     f"forma.csv"
                                 )
     multi(drop_duplicate_piezas_df, COL_PAIS, "PA")
@@ -240,14 +237,14 @@ def main(WB_PATH):
     print("Files created successfully!")
 
 
-    with open("import.cypher") as file:
-        queries = file.read().split(";\n")
-        with GraphDatabase.driver(uri, auth=(username, password)) as driver:
-            for query in queries:
-                    _, summary, _ = driver.execute_query(query, database_="neo4j")
-                    print(f"{summary.query} completed in {summary.result_available_after} ms")
+    # with open("import.cypher") as file:
+    #     queries = file.read().split(";\n")
+    #     with GraphDatabase.driver(uri, auth=(username, password)) as driver:
+    #         for query in queries:
+    #                 _, summary, _ = driver.execute_query(query, database_="neo4j")
+    #                 print(f"{summary.query} completed in {summary.result_available_after} ms")
 
-    print("data imported to neo4j")
+    # print("data imported to neo4j")
 
 if __name__ == "__main__":
     args = sys.argv
