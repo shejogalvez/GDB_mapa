@@ -1,7 +1,7 @@
 <template>
     <div class="user-details-container">
       <button @click="openModal" class="modern-button">editar pieza</button>
-      <FormModal :isVisible="showModal" @close="()=>{showModal = false}" />
+      <FormModal :isVisible="showModal" title="Editar pieza" @close="()=>{showModal = false}" />
       <div class="user-details-card">
         <h1>Info pieza</h1>
         <!-- User Image -->
@@ -32,8 +32,10 @@
             <p><strong>{{ key }}:</strong> {{ val }} </p>
           </template>
           <p v-if="component.ubicacion"><strong>ubicacion:</strong> {{ component.ubicacion.name }} </p>
-          <p v-if="component.forma"><strong>dimensiones:</strong> {{ component.forma }} </p>
-            <br><br>
+          <template v-for="(val, key, idx) in component.forma">
+            <p><strong>{{ key }}:</strong> {{ val }} </p>
+          </template>
+          <br><br>
         </div>
       </div>
     </div>
@@ -47,7 +49,6 @@
   export default {
     data() {
       return {
-        components: [],
         piece: {},
         showModal: false,
       };
@@ -80,7 +81,7 @@
         for (const component of componentsData){
           const cprops = component['componente'];
           delete component['componente'];
-          const connected_nodes = {}
+          const connected_nodes = {forma: {}}
           for (const key of ['forma', 'ubicacion']) {
           const val = component[key];
             if (val) {
@@ -94,7 +95,6 @@
         }
         pieceData.components = componentsData;
         
-        useStore().$patch({currentPiece: pieceData});
         this.piece = pieceData
         console.log(this.piece);
       } catch (error) {
@@ -107,7 +107,8 @@
       async fetchDetails() {
       },
       openModal() {
-        this.showModal = true
+        useStore().$patch({currentPiece: {...this.piece}}); // copies fetched data to form
+        this.showModal = true;
       },
       closeModal() {
         this.showModal = false;  // Close the modal

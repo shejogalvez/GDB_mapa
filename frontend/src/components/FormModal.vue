@@ -166,6 +166,10 @@ export default {
             type: Boolean,
             required: true
         },
+        title: {
+            type: String,
+            default: "Crear Pieza"
+        }
     },
     components: {
       TreeDropdown,
@@ -234,7 +238,8 @@ export default {
                 console.error(error)
             }
         },
-        closeModal() {
+        exitForm() {
+            this.pieceStore.$reset();
             this.$emit('close');
         },
         handleComponentFileUpload(component, event) {
@@ -263,6 +268,14 @@ export default {
             }
             return result;
         },
+        parseComponentSubnodes(connected_nodes) {
+            let result = [];
+            if (connected_nodes.forma)
+                result.push({properties: connected_nodes.forma, node_label: "forma", method: "MERGE"})
+            if (connected_nodes.ubicacion)
+                result.push({node_id: connected_nodes.ubicacion.id, node_label: "ubicacion", id_key: "id"})
+            return result;
+        },
         async submitForm() {
             let pieceData = this.pieceData;
             if (this.rules.some((rule) => rule(pieceData.properties.id) !== true)) return
@@ -274,10 +287,7 @@ export default {
                 components: pieceData.components.map(component => ({
                     id: component.id, // fix
                     properties: component.properties,
-                    connected_nodes: [
-                        {node_id: component.connected_nodes["ubicacion"].id, node_label: "ubicacion", id_key: "id"},
-                        {properties: component.connected_nodes["forma"], node_label: "forma", method: "MERGE"},
-                    ]
+                    connected_nodes: this.parseComponentSubnodes(component.connected_nodes)
                 }))
             });
             console.log(body);
@@ -301,9 +311,13 @@ export default {
                         'Content-Type': 'multipart/form-data'
                     }
                 })
-                console.log(response);
-                this.closeModal();
-                this.pieceStore.$reset();
+                if (response.data.status_code == 200){
+                    console.log(response);
+                    this.exitForm();
+                }
+                else {
+                    alert(response.data.detail);
+                }
             }
             catch (e) {
                 console.error(e.response.data.detail);
