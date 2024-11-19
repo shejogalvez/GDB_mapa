@@ -2,19 +2,19 @@
     <v-container>
         <!-- Shape Selector -->
         <v-select
-          v-model="component_properties.forma"
+          v-model="component_forma.forma"
           :items="shapes"
           label="Seleccionar forma"
           outlined
-          @change="resetFields"
+          @update:model-value="resetFields"
         ></v-select>
   
         <!-- Dynamic Fields -->
-        <div v-if="component_properties.forma === 'Cilindro'">
+        <div v-if="component_forma.forma === 'Cilindro'">
           <v-row>
             <v-col cols="12" sm="6">
               <v-text-field
-                v-model="component_properties.diametro"
+                v-model="component_forma.diametro"
                 label="diametro (cm)"
                 type="number"
                 outlined
@@ -23,7 +23,7 @@
             </v-col>
             <v-col cols="12" sm="6">
               <v-text-field
-                v-model="component_properties.alto"
+                v-model="component_forma.alto"
                 label="alto (cm)"
                 type="number"
                 outlined
@@ -33,11 +33,11 @@
           </v-row>
         </div>
   
-        <div v-if="component_properties.forma === 'Plano'">
+        <div v-if="component_forma.forma === 'Plano'">
           <v-row>
             <v-col cols="12" sm="6">
               <v-text-field
-                v-model="component_properties.ancho"
+                v-model="component_forma.ancho"
                 label="ancho (cm)"
                 type="number"
                 outlined
@@ -46,7 +46,7 @@
             </v-col>
             <v-col cols="12" sm="6">
               <v-text-field
-                v-model="component_properties.largo"
+                v-model="component_forma.largo"
                 label="largo (cm)"
                 type="number"
                 outlined
@@ -56,11 +56,11 @@
           </v-row>
         </div>
   
-        <div v-if="component_properties.forma === 'Prisma'">
+        <div v-if="component_forma.forma === 'Prisma'">
           <v-row>
             <v-col cols="12" sm="4">
               <v-text-field
-                v-model="component_properties.alto"
+                v-model="component_forma.alto"
                 label="alto (cm)"
                 type="number"
                 outlined
@@ -69,7 +69,7 @@
             </v-col>
             <v-col cols="12" sm="4">
               <v-text-field
-                v-model="component_properties.ancho"
+                v-model="component_forma.ancho"
                 label="ancho (cm)"
                 type="number"
                 outlined
@@ -78,7 +78,7 @@
             </v-col>
             <v-col cols="12" sm="4">
               <v-text-field
-                v-model="component_properties.largo"
+                v-model="component_forma.largo"
                 label="largo (cm)"
                 type="number"
                 outlined
@@ -107,18 +107,19 @@
     },
     methods: {
       resetFields() {
-        console.log(this.pieceStore.$state.currentPiece);
-        this.component_properties = {
+        this.pieceStore.$state.currentPiece.components[this.component_index].connected_nodes.forma = {
           diametro: null,
           alto: null,
           ancho: null,
           largo: null,
+          forma: this.component_forma.forma,
         };
+        console.log(this.pieceStore.$state.currentPiece);
       },
     },
     computed: {
-      component_properties() {
-        return this.pieceStore.$state.currentPiece.components[this.component_index].properties;
+      component_forma() {
+        return this.pieceStore.$state.currentPiece.components[this.component_index].connected_nodes.forma;
       }
     }
   };

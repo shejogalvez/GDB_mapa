@@ -9,10 +9,8 @@ export const useStore = defineStore('store', {
             uploadedFiles: [],
             previewImages: [],
             components: [{
-                /** @type {Ubicacion} */
-                selectedUbicacion: null,
                 id: null,
-                connected_nodes: {},
+                connected_nodes: {forma: {}},
                 properties: {},
                 uploadedFiles: [],
                 previewImages: []

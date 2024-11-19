@@ -110,7 +110,7 @@
                             <TreeDropdown
                             :options = "ubicaciones_data"
                             :children_key = "'ubicacion_contiene'"
-                            @input="(ubicacion) => component.connected_nodes.ubicacion = ubicacion?.id"
+                            @input="(ubicacion) => component.connected_nodes.ubicacion = ubicacion"
                             >
                             </TreeDropdown>
                             
@@ -258,7 +258,10 @@ export default {
                 components: pieceData.components.map(component => ({
                     id: component.id, // fix
                     properties: component.properties,
-                    connected_nodes: this.parseSubnodes(component.connected_nodes, "id")
+                    connected_nodes: [
+                        {node_id: component.connected_nodes["ubicacion"].id, node_label: "ubicacion", id_key: "id"},
+                        {properties: component.connected_nodes["forma"], node_label: "forma", method: "MERGE"},
+                    ]
                 }))
             });
             console.log(body);
@@ -292,10 +295,8 @@ export default {
         },
         agregarComponente() {
             this.pieceData.components.push({
-                /** @type {Ubicacion} */
-                selectedUbicacion: null,
                 id: null,
-                connected_nodes: {},
+                connected_nodes: {forma: {}},
                 properties: {},
                 uploadedFiles: [],
                 previewImages: []
