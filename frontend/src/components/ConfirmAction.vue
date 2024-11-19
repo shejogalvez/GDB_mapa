@@ -1,16 +1,13 @@
 <template>
     <div>
+      <div @click="open=true" style="display: inline-block;">
+        <slot></slot>
+      </div>
       <v-dialog
         v-model="open"
         max-width="400"
         persistent
       >
-        <template v-slot:activator="{ props: activatorProps }">
-          <v-btn color="blue" v-bind="activatorProps">
-            {{ buttonText }}
-          </v-btn>
-        </template>
-  
         <v-card
           :text="text"
           :title="title"
@@ -39,10 +36,6 @@ export default {
         },
         title: {
             type: String
-        },
-        buttonText: {
-            type: String,
-            default: "Enviar"
         },
         btnType: {
           type: String,

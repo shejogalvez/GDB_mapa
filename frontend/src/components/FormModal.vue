@@ -4,8 +4,14 @@
         <!-- Modal Form -->
         <div v-if="isVisible" class="modal-overlay">
             <div id="form-container" class="modal">
-                <h2>Crear Pieza</h2>
-                <span class="close" @click="closeModal">&times;</span>
+                <h2>{{ title }}</h2>
+                <ConfirmAction 
+                    text="Se van a borrar los datos del formulario" 
+                    title="Confirmar salida" 
+                    :confirmFunction="exitForm"
+                >
+                    <span class="close">&times;</span>
+                </ConfirmAction>
                     <v-form class="form-content" @submit="submitForm">
                         <br>
                         <v-row>
@@ -132,7 +138,11 @@
                         </div>
                         <br><br>
                         <!-- Submit Button -->
-                        <ConfirmAction text="Se van a guardar los datos" title="Confirmar envío de formulario" buttonText="Submit" :confirmFunction="submitForm"></ConfirmAction>
+                        <ConfirmAction text="Se van a guardar los datos" title="Confirmar envío de formulario" :confirmFunction="submitForm">
+                            <v-btn color="blue">
+                                Submit
+                            </v-btn>
+                        </ConfirmAction>
                     </v-form>
             </div>
     
