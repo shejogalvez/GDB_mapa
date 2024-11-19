@@ -82,9 +82,9 @@
           delete component['componente'];
           const connected_nodes = {}
           for (const key of ['forma', 'ubicacion']) {
-          const val = pieceData[key];
+          const val = component[key];
             if (val) {
-              connected_nodes[key] = val.name;
+              connected_nodes[key] = val;
             }
           }
           component.connected_nodes = connected_nodes;
