@@ -199,7 +199,7 @@ def add_piece(request: Request,
     try:
         result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
     except ConstraintError:
-        return HTTPException(401, detail="Número de inventario repetido")
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Número de inventario repetido")
     log = request_to_log(request, user, node_create)
     logdb = db.create_log(log)
     print(logdb)
