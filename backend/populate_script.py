@@ -1,11 +1,12 @@
 from db import get_db_driver
 
 queries = """
-CREATE CONSTRAINT pieza_pk IF NOT EXISTS FOR (n:piezas) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT pieza_pk IF NOT EXISTS FOR (n:pieza) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT componente_pk IF NOT EXISTS FOR (n:componente) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT user_pk IF NOT EXISTS FOR (n:user) REQUIRE n.username IS UNIQUE;
 CREATE CONSTRAINT pais_pk IF NOT EXISTS FOR (n:pais) REQUIRE n.name IS UNIQUE;
 CREATE CONSTRAINT localidad_pk IF NOT EXISTS FOR (n:localidad) REQUIRE n.name IS UNIQUE;
+CREATE CONSTRAINT cultura_pk IF NOT EXISTS FOR (n:cultura) REQUIRE n.name IS UNIQUE;
 
 LOAD CSV WITH HEADERS FROM 'file:///pais.csv' AS row
 MERGE (:pais {name: row.pais});
