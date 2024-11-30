@@ -91,7 +91,7 @@ def parse_operation(operation_str: str, key: str) -> str:
             return f"contains(${key})"
 
 def parse_filters(args: dict[str, list[Filter]]) -> tuple[dict[str, str], dict[str, Any]]:
-    if (not args): return ""
+    if (not args): return {}, {}
     # for each node type store WHERE statements filtering properties
     query_expressions = dict()
     query_kwargs = dict()
