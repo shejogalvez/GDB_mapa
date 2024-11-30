@@ -22,16 +22,15 @@ COL_EXPO      = "exposiciones"
 ATRIBUTOS_COMPONENTES = [
     "nombre_comun", 
     "nombre_especifico",
-    "materialidad", 
-    "peso_(gr)", 
-    "tecnica",
-    "marcas_o_inscripciones",
     "descripcion_fisica",
     'descripcion_col',
     'descripcion_cr',
     "tipologia",
     "funcion",
-    "iconografia",
+    "materialidad", 
+    "tecnica",
+    "peso_(gr)", 
+    "marcas_o_inscripciones",
     "estado_genral_de_conservacion",
     'responsable_coleccion',
     'fecha_ultima_modificacion'
@@ -39,22 +38,47 @@ ATRIBUTOS_COMPONENTES = [
 
 ATRIBUTOS_PIEZAS = [
     #"numero_de_inventario", #ID
-    "numero_de registro_anterior",
+    "conjunto",
     "coleccion",
     "SURDOC",
     "clasificacion",
-    "conjunto",
-    "autor",
-    "fecha_de_creacion",
-    "contexto_historico",
-    "notas_investigacion",
-    "bibliografia",
     "avaluo",
+    "numero_de registro_anterior",
+    "contexto_historico",
+    "iconografia",
+    "notas_investigacion",
+    "fecha_de_creacion",
+    "autor",
+    "bibliografia",
     "procedencia",
     "donante",
     "fecha_ingreso"
 ]
 
+total = ["numero_de_inventario","letra","Revisión","numero_de registro_anterior","SURDOC","ubicacion","deposito","estante","caja_anterior","caja_actual","tipologia","coleccion","clasificacion","conjunto","nombre_comun","nombre_especifico","autor","filiacion_cultural","pais","localidad","fecha_de_creacion","descripcion_col","marcas_o_inscripciones","tecnica","materialidad","descripcion_cr","alto_o_largo_(cm)","ancho_(cm)","profundidad_(cm)","diametro_(cm)","espesor_(mm)","peso_(gr)","funcion","contexto_historico","bibliografia","iconografia","notas_investigacion","estado_genral_de_conservacion","responsable_conservacion","fecha_actualizacion_cr","comentarios_cr","exposiciones","avaluo","procedencia","donante","fecha_ingreso","responsable_coleccion","fecha_ultima_modificacion"]
+
+# untracked = [x for x in total if x not in ATRIBUTOS_COMPONENTES + ATRIBUTOS_PIEZAS]
+# print(untracked)
+# dataframe = pd.read_excel("2024 Inventario Colecciones MAPA-PCMAPA (1).xlsx")
+# dataframe = dataframe.reset_index()
+# # cleans spaces in string fields
+# dataframe = dataframe.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+
+# # Initialize an empty dictionary to store ids where differences are found per column
+# different_values_ids = {col: [] for col in ATRIBUTOS_PIEZAS}
+
+# # Group by 'id' column
+# grouped = dataframe.groupby('numero_de_inventario')
+
+# # Iterate through each group
+# for group_id, group in grouped:
+#     for col in ATRIBUTOS_PIEZAS:
+#         # Check if the values in the current column vary within the group
+#         if group[col].nunique(True) > 1:
+#             # If they do, add the id to the corresponding list for that column
+#             different_values_ids[col].append(group_id)
+
+# print(different_values_ids)
 
 # Function to count blank values (NaN or empty string) in a row
 def count_blank_values(row) -> int:
@@ -138,7 +162,7 @@ def main(WB_PATH):
     class Ubicacion(BaseModel):
         label: str
         name: str
-        id: UUID = Field(default_factory=uuid4)
+        id: UUID|str = Field(default_factory=uuid4)
         children: dict[str, 'Ubicacion'] = {}
 
     # lista principal de ubicaciones
@@ -159,11 +183,15 @@ def main(WB_PATH):
             col_val = row[col_name]
             if pd.isna(col_val): continue
             #print(f"{col_name}{index}: {col_val}")
-            if col_val not in current_node.children:
-                new_ubicacion = Ubicacion(label=col_name, name=str(col_val))
-                current_node.children[new_ubicacion.name] = new_ubicacion
+            col_val = str(col_val)
+            if col_val == "":
+                continue
+            ubicacion_token = col_val + col_name # token identifica hijos de un mismo nodo
+            if ubicacion_token not in current_node.children:
+                new_ubicacion = Ubicacion(label=col_name, name=col_val)
+                current_node.children[ubicacion_token] = new_ubicacion
             else:
-                new_ubicacion = current_node.children[col_val]
+                new_ubicacion = current_node.children[ubicacion_token]
             current_node = new_ubicacion
         # componente se conecta a la ultima ubicación sobre la que se pasó/creó en el arbol 
         if new_ubicacion:
@@ -220,6 +248,38 @@ def main(WB_PATH):
         atributos.extend([get_row_component_id(row), forma])
         formas_propiedades.append(atributos)
 
+    minimal_distinct_expo: set[str] = set()
+    dict_expo_pieza = dict()
+    for _, row in dataframe.iterrows():
+        row_exposicion = str(row[COL_EXPO])
+        if row_exposicion == 'nan': continue
+        if row_exposicion in minimal_distinct_expo:
+            continue
+        to_add = []
+        to_delete = []
+        for expo in minimal_distinct_expo:
+            if expo in row_exposicion:
+                to_delete.append(expo)
+                to_add.append(row_exposicion)
+                to_add.append(expo.replace(row_exposicion, ''))
+        if len(to_add) > 0:
+            for elem in to_delete:
+                minimal_distinct_expo.remove(elem)
+            for elem in to_add:
+                minimal_distinct_expo.add(elem)
+            continue
+        minimal_distinct_expo.add(row_exposicion)
+
+    #print(minimal_distinct_expo)
+    for expo in minimal_distinct_expo:
+        dict_expo_pieza[expo] = []
+    for _, row in dataframe.iterrows():
+        row_exposicion = str(row[COL_EXPO])
+        for expo in minimal_distinct_expo:
+            if expo in row_exposicion:
+                dict_expo_pieza[expo].append(row['numero_de_inventario'])
+    #print(dict_expo_pieza)
+
     # export formas info
     dataframe_to_csv(pd.DataFrame(list(formas_propiedades), 
                                     columns=ATRIBUTOS_FORMAS + ['id_componente','forma']), 
@@ -248,7 +308,7 @@ def main(WB_PATH):
 
 if __name__ == "__main__":
     args = sys.argv
-    print(args)
+    # print(args)
     if len(args) < 2:
         print("ingresar ruta de archivo excel a cargar")
         exit(-1)
