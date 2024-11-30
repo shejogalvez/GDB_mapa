@@ -311,8 +311,8 @@ export default {
                         'Content-Type': 'multipart/form-data'
                     }
                 })
-                if (response.data.status_code == 200){
-                    console.log(response);
+                console.log(response);
+                if (!response.data.status_code){
                     this.exitForm();
                 }
                 else {
