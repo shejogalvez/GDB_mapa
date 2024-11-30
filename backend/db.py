@@ -386,11 +386,11 @@ def detete_piece(tx: Transaction, id: str):
             MATCH (n {id: $nodeId})
             OPTIONAL MATCH (n)--(c: componente)
             OPTIONAL MATCH (c)--(f :forma)
-            OPTIONAL MATCH (n)--(in :imagen)
-            OPTIONAL MATCH (c)--(ic :imagen)
-            DETACH DELETE f, n, c, in, ic
+            OPTIONAL MATCH (n)--{0, 1} ()--(i :imagen)
+            DETACH DELETE f, n, c
+            RETURN i
             """
-    return tx.run(query, nodeId=id)
+    return tx.run(query, nodeId=id).data()
 
 def delete_user(username: str):
     query = """

@@ -229,13 +229,25 @@ async def add_component(request: Request,
     logdb = db.create_log(log)
     return result
 
-@app.delete("/pieza/", dependencies=[Depends(get_write_permission_user)])
-async def delete_piece(node_id):
-    to_delete = ["forma", "componente"]
+@app.delete("/pieces/", dependencies=[Depends(get_write_permission_user)])
+async def delete_piece(node_id: str):
     with db.get_db_driver() as driver:
         with driver.session() as session:
             with session.begin_transaction() as tx:
-                return db.detete_piece(tx, node_id, to_delete)
+                result = db.detete_piece(tx, node_id)
+                for image in result:
+                    if (image['i']):
+                        filename = image["i"]["filename"]
+                        print(filename)
+                        try:
+                            path = os.path.join(UPLOAD_DIR, filename)
+                            print(path)
+                            db.delete_node_by_id_key(["imagen"], "filename", filename, tx)
+                            os.remove(path)
+                        except OSError:
+                            pass
+                            # return HTTPException(status_code=404, detail=f"image to delete was not found")
+                return result
 
 @app.post("/upload-image/", dependencies=[Depends(get_write_permission_user)])
 async def upload_image(files: List[UploadFile] = File(...)):
