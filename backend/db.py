@@ -8,6 +8,12 @@ uri = f"bolt://{ os.getenv("NEO4J_HOSTNAME", "localhost") }:7687"  # Bolt URI of
  
 username, password = os.getenv("NEO4J_AUTH").split('/')  # Your Neo4j username
 
+class ComponentCreationException(Exception):
+    pass
+
+class PieceCreationException(Exception):
+    pass
+
 def _get_data_only(result: Result):
     return result.data()
 
@@ -307,22 +313,25 @@ def create_update_component(piece_id: str, component_id: str | None, subnodes: l
     connections are passed ass a list of SubNodes where you indicate a property to match, also properties
     of connected nodes can be updated"""
     if (component_id):
-        clause = "MATCH (c :componente)<-[:compuesto_por]-(p) WHERE elementid(c) = $component_id"
+        clause = "MATCH (componente :componente)<-[:compuesto_por]-(pieza) WHERE elementid(componente) = $component_id"
     else:
-        clause = "CREATE (c :componente)<-[:compuesto_por]-(p)"
+        clause = "CREATE (componente :componente)<-[:compuesto_por]-(pieza)"
     query = f"""
-            MATCH (p) WHERE elementid(p) = $piece_id
+            MATCH (pieza) WHERE elementid(pieza) = $piece_id
             {clause}
-            MERGE (c) -[:tiene_forma]-> (f :forma)
+            MERGE (componente) -[:tiene_forma]-> (f :forma)
             WITH *, $properties AS mainProps
             UNWIND mainProps AS properties
-            SET c += properties
-            """ + parse_subnodes(subnodes, "c", "componente") + "RETURN c"
+            SET componente += properties
+            """ + parse_subnodes(subnodes, "componente", "componente") + "RETURN elementid(componente) as id, componente"
     print(query)
-    if tx:
-        return tx.run(query, piece_id=piece_id, component_id=component_id, properties=properties)
-    else:
-        return run_query(query, piece_id=piece_id, component_id=component_id, properties=properties)
+    try:
+        if tx:
+            return tx.run(query, piece_id=piece_id, component_id=component_id, properties=properties).single().data()
+        else:
+            return run_query(query, piece_id=piece_id, component_id=component_id, properties=properties)[0]
+    except (IndexError, KeyError):
+        raise ComponentCreationException('non existant piece_id or component_id value')
 
 def create_update_piece(piece_id: str|None, components: list[NodeCreate], subnodes: list[SubNode], properties: list[dict] ):
     """
@@ -336,17 +345,20 @@ def create_update_piece(piece_id: str|None, components: list[NodeCreate], subnod
         with driver.session() as session:
             with session.begin_transaction() as tx:
                 if (piece_id):
-                    start_clause = "MATCH (p) WHERE elementid(p) = $nodeId"
+                    start_clause = "MATCH (pieza) WHERE elementid(pieza) = $nodeId"
                 else:
-                    start_clause = "CREATE (p :pieza)"
+                    start_clause = "CREATE (pieza :pieza)"
                 query = start_clause + """
-                        WITH p, $properties AS mainProps
+                        WITH pieza, $properties AS mainProps
                         UNWIND mainProps as properties
-                        SET p += properties
-                        """ + parse_subnodes(subnodes, "p", "pieza") + " RETURN elementid(p), p"
+                        SET pieza += properties
+                        """ + parse_subnodes(subnodes, "pieza", "pieza") + " RETURN elementid(pieza) as id, pieza"
                 print(query, components)
-                result = tx.run(query, nodeId=piece_id, properties=properties).single().data()
-                piece_element_id = result['elementid(p)']
+                try:
+                    result = tx.run(query, nodeId=piece_id, properties=properties).single().data()
+                except KeyError:
+                    raise PieceCreationException("non existant piece_id value")
+                piece_element_id = result['id']
                 results.append(result)
                 for component in components:
                     result = create_update_component(piece_element_id, component.id, component.connected_nodes, component.properties, tx).single()
