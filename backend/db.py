@@ -226,9 +226,10 @@ def get_pieces_with_components_paginated_filtered(query_filters: dict[str, list[
         MATCH (pieza) -[:compuesto_por]-> (componente:componente)
         OPTIONAL MATCH (componente) -[]-> (forma:forma)
         OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
+        OPTIONAL MATCH ubicacion_path = (:ubicacion {name: "root"}) (()-[:ubicacion_contiene]->()){0,4} (ubicacion)
         OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
-        WITH componente, forma, ubicacion, collect(imagen) as imagenes
-        RETURN DISTINCT {componente:componente, forma:forma, ubicacion:ubicacion, imagenes:imagenes} as componentes
+        WITH componente, forma, apoc.text.join([node in nodes(ubicacion_path) | node.name], " -> ") as ubicaciones, collect(imagen.filename) as imagenes
+        RETURN DISTINCT {componente:componente, forma:forma, ubicacion:ubicaciones, imagenes:apoc.text.join(imagenes, ",\n")} as componentes
     }
     """
     query= f"""
