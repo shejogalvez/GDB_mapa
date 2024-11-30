@@ -28,7 +28,7 @@
             <FilterTH @applyFilter="filterRows" header_text="Pais" property_label="name" node_label="pais"></FilterTH>
             <FilterTH @applyFilter="filterRows" header_text="Localidad" property_label="name" node_label="localidad"></FilterTH>
             <FilterTH @applyFilter="filterRows" header_text="Afiliacion Cultural" property_label="name" node_label="cultura"></FilterTH>  
-            <FilterTH @applyFilter="filterRows" header_text="exposiciones" property_label="name" node_label="pais"></FilterTH>
+            <FilterTH @applyFilter="filterRows" header_text="exposiciones" property_label="name" node_label="exposicion"></FilterTH>
           </tr>
         </thead>
         <tbody>
