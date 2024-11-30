@@ -24,10 +24,12 @@ def _get_dataframe(result: Result):
 def get_db_driver() -> Driver:
     return GraphDatabase.driver(uri, auth=(username, password))
 
-# Initialize the driver
-def run_query(query: str, database_="neo4j", result_transformer = _get_data_only, **kwarws) -> EagerResult:
+# runs a query and returns result.data()
+def run_query(query: str, database_="neo4j", tx: Transaction = None, **kwarws) -> list[dict[str, Any]]:
+    if tx:
+        return tx.run(query, kwarws).data()
     with GraphDatabase.driver(uri, auth=(username, password)) as driver:
-        return driver.execute_query(query, kwarws, database_=database_, result_transformer_=result_transformer)
+        return driver.execute_query(query, kwarws, database_=database_, result_transformer_=_get_data_only)
 
 ## UTILS ##
 # Parse dict and returns str to match properties in cypher query
@@ -273,10 +275,7 @@ def get_piece_by_elementid(piece_id, tx:Transaction=None):
     OPTIONAL MATCH (pieza) -[]-> (imagen:imagen)
     WITH pieza, pais, localidad, exposicion, cultura, collect(imagen) as imagenes
     RETURN DISTINCT elementid(pieza) as id, pieza, pais, localidad, exposicion, cultura, imagenes"""
-    if tx:
-        result = tx.run(query, piece_id=piece_id).data()
-    else: 
-        result = run_query(query, piece_id=piece_id)
+    result = run_query(query, piece_id=piece_id, tx=tx)
     return result[0] if result else None
 
 def filter_by_nodes_names_connected(name_array: list, tag: str, other_label: str = "", skip: int = 0, limit: int = 0):
@@ -329,10 +328,7 @@ def create_update_component(piece_id: str, component_id: str | None, subnodes: l
             """ + parse_subnodes(subnodes, "componente", "componente") + "RETURN elementid(componente) as id, componente"
     print(query)
     try:
-        if tx:
-            return tx.run(query, piece_id=piece_id, component_id=component_id, properties=properties).single().data()
-        else:
-            return run_query(query, piece_id=piece_id, component_id=component_id, properties=properties)[0]
+        return run_query(query, piece_id=piece_id, component_id=component_id, properties=properties, tx=tx)[0]
     except (IndexError, KeyError):
         raise ComponentCreationException('non existant piece_id or component_id value')
 
@@ -399,13 +395,13 @@ def delete_user(username: str):
             """
     return run_query(query, username=username)
 
-def delete_image_by_filename(filename: str):
+def delete_image_by_filename(filename: str, tx: Transaction=None):
     query = """
             MATCH (n: imagen {filename: $filename})
             DETACH DELETE n
             """
     print(query, filename)
-    return run_query(query, filename=filename)
+    return run_query(query, filename=filename, tx=tx)
 
 def delete_node_by_id_key(labels: list[str], key: str, val: Any, tx: Transaction = None):
     query = f"""
@@ -413,8 +409,7 @@ def delete_node_by_id_key(labels: list[str], key: str, val: Any, tx: Transaction
             WHERE n[$key] = $val
             DETACH DELETE n
             """
-    if tx: return tx.run(query, key=key, val=val)
-    return run_query(query, key=key, val=val)
+    return run_query(query, key=key, val=val, tx=tx)
 
 def create_log(log: Log):
     """creates a log connection between"""
