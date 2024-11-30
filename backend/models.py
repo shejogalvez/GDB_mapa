@@ -26,10 +26,11 @@ NODES_RELATIONS: dict[tuple[NodeLabel, NodeLabel], str] = {
 class SubNode(BaseModel):
     """Represents a node that is connected to a main node when creating/updating the main node, subnodes are represented by 
     {node_id} which is the property with label {id_key}, depending on the method the action will be determinded:
-        - CREATE: Creates connection between subnode and main node, creates subnode if node_id noesn't exists and sets {properties}
+        - CREATE: Creates connection between subnode and main node, creates subnode if node_id doesn't exists and sets {properties}
         - UPDATE: The same as CREATE but deletes all other connections that matches (main node) -> (:{node_label})
         - DELETE: Deletes subnode if exists
-        - DETACH: Deletes conection with subnode if exists"""
+        - DETACH: Deletes conection with subnode if exists
+        - MERGE : Creates connection between subnode and main node if subnode with same node_id isn't already connected"""
     node_id: Optional[str] = None 
     properties: Optional[dict[str, Any]] = None
     #relation_label: Optional[str] = None
@@ -79,7 +80,7 @@ class UserInDB(User):
     salt: Optional[str] = "" #TODO: not optional
 
 # Operation: keywords que representan operacionaes para comparar campos al filtrar
-Operation = Literal['=', '>=', '<', '<=', '>', 'contains']
+Operation = Literal['=', '>=', '<', '<=', '!=', '>', 'contains']
 
 class Filter(BaseModel):
     key: str 

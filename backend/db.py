@@ -85,6 +85,8 @@ def parse_operation(operation_str: str, key: str) -> str:
     match operation_str:
         case "=":
             return f"= ${key}"
+        case "!=":
+            return f"<> ${key}"
         case ">=":
             return f">= ${key}"
         case ">":
@@ -248,7 +250,7 @@ def get_piece_components(piece_id):
     Returns
     -------
     ``list(id:str, componente:node, forma:node, ubicacion:node, imagen:node)``"""
-    query = f"""
+    query = """
     MATCH (p) -[:compuesto_por]-> (componente:componente) WHERE elementid(p) = $piece_id
     OPTIONAL MATCH (componente) -[]-> (forma:forma)
     OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
@@ -295,7 +297,7 @@ def create_user(username: str, hashed_password: str, salt: str, role: str):
 
 def create_node(tags: list[str] | None = None, **properties):
     # TODO: validate tags (labels)
-    tags = f"".join(map(lambda x : f" :{x}", tags))
+    tags = parse_labels(tags)
     properties_query = parse_properties(properties)
     query = f"CREATE (n{tags} {properties_query})"
     run_query(query, **properties)
@@ -361,9 +363,9 @@ def create_update_piece(piece_id: str|None, components: list[NodeCreate], subnod
                 piece_element_id = result['id']
                 results.append(result)
                 for component in components:
-                    result = create_update_component(piece_element_id, component.id, component.connected_nodes, component.properties, tx).single()
-                    if result: # TODO: give error message when component update fails
-                        results.append(result.data())
+                    result = create_update_component(piece_element_id, component.id, component.connected_nodes, component.properties, tx)
+                    
+                    results.append(result)
                 tx.commit()
     return results
 
@@ -403,6 +405,15 @@ def delete_image_by_filename(filename: str):
             """
     print(query, filename)
     return run_query(query, filename=filename)
+
+def delete_node_by_id_key(labels: list[str], key: str, val: Any, tx: Transaction = None):
+    query = f"""
+            MATCH (n {parse_labels(labels)})
+            WHERE n[$key] = $val
+            DETACH DELETE n
+            """
+    if tx: return tx.run(query, key=key, val=val)
+    return run_query(query, key=key, val=val)
 
 def create_log(log: Log):
     """creates a log connection between"""
