@@ -62,10 +62,11 @@ if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
 ### UTILS ###
-def request_to_log(request: Request, user: UserInDB, body: NodeCreate) -> Log:
+def request_to_log(request: Request, user: UserInDB, body: NodeCreate, node_id: str) -> Log:
     endpoint = request.url.path
     request_method = request.method
-    return Log(username=user.username, endpoint=endpoint, request_method=request_method, request_body=body.model_dump_json(), node_elementid=body.id)
+    print(f"{user.username=} {endpoint=}", f"{request_method=}", f"{body.model_dump_json()=} {body.id=}")
+    return Log(username=user.username, endpoint=endpoint, request_method=request_method, request_body=body.model_dump_json(), node_elementid=node_id)
 
 def upload_file(file: UploadFile, relative_path: str):
     file_path = os.path.join(UPLOAD_DIR, relative_path)
@@ -167,10 +168,6 @@ def get_pieces_filtered(query_filters: dict[NodeLabel, list[Filter]], skip: int 
     # property_filter = json.decoder.JSONDecoder().decode(params["property_filter"])
     return db.get_pieces_info_paginated_filtered(query_filters, skip, limit)
 
-@app.get("/all/", dependencies=[Depends(get_read_permission_user)])
-def get_pieces_with_components_paginated(skip: int = 0, limit: int = 50):
-    return db.get_pieces_with_components_paginated(skip, limit)
-
 @app.put("/add-piece", dependencies=[Depends(get_write_permission_user)])
 def add_piece(request: Request, 
               node_create: Annotated[PieceCreate, Body(...)], 
@@ -196,11 +193,13 @@ def add_piece(request: Request,
     parsed_component_images = parse_component_files(component_images, len(node_create.components))
     for i, component in enumerate(node_create.components):
         attach_images_to_node(component, parsed_component_images[i])
+    #print(node_create.components)
     try:
         result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
     except ConstraintError:
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Número de inventario repetido")
-    log = request_to_log(request, user, node_create)
+    #print(result)
+    log = request_to_log(request, user, node_create, result[0]['id'])
     logdb = db.create_log(log)
     print(logdb)
     return result
@@ -225,7 +224,8 @@ async def add_component(request: Request,
     """
     attach_images_to_node(node_create, images)
     result = db.create_update_component(piece_id, node_create.id, node_create.connected_nodes, node_create.properties)
-    log = request_to_log(request, user, node_create)
+    #print(result)
+    log = request_to_log(request, user, node_create, piece_id)
     logdb = db.create_log(log)
     return result
 
@@ -238,10 +238,9 @@ async def delete_piece(node_id: str):
                 for image in result:
                     if (image['i']):
                         filename = image["i"]["filename"]
-                        print(filename)
+                        # print(filename)
                         try:
                             path = os.path.join(UPLOAD_DIR, filename)
-                            print(path)
                             db.delete_node_by_id_key(["imagen"], "filename", filename, tx)
                             os.remove(path)
                         except OSError:
