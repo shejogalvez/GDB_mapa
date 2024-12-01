@@ -377,14 +377,15 @@ def delete_component(tx: Transaction, component_id: str):
     return tx.run(query, nodeId=component_id)
 
 def detete_piece(tx: Transaction, id: str):
-    """Deletes pieza, deletes edges and nodes that depend on pieza"""
+    """Deletes pieza, deletes edges and nodes that depend on pieza and returns filenames of files to be deleted"""
     query = """
             MATCH (n {id: $nodeId})
             OPTIONAL MATCH (n)--(c: componente)
             OPTIONAL MATCH (c)--(f :forma)
             OPTIONAL MATCH (n)--{0, 1} ()--(i :imagen)
-            DETACH DELETE f, n, c
-            RETURN i
+            WITH *, i.filename as filename
+            DETACH DELETE f, n, c, i
+            RETURN filename
             """
     return tx.run(query, nodeId=id).data()
 

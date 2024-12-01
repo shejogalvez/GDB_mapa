@@ -234,19 +234,18 @@ async def delete_piece(node_id: str):
     with db.get_db_driver() as driver:
         with driver.session() as session:
             with session.begin_transaction() as tx:
-                result = db.detete_piece(tx, node_id)
-                for image in result:
-                    if (image['i']):
-                        filename = image["i"]["filename"]
+                files_to_delete = db.detete_piece(tx, node_id)
+                for image in files_to_delete:
+                    filename = image["filename"]
+                    if (filename):
                         # print(filename)
                         try:
                             path = os.path.join(UPLOAD_DIR, filename)
-                            db.delete_node_by_id_key(["imagen"], "filename", filename, tx)
                             os.remove(path)
                         except OSError:
                             pass
                             # return HTTPException(status_code=404, detail=f"image to delete was not found")
-                return result
+                return 
 
 @app.post("/upload-image/", dependencies=[Depends(get_write_permission_user)])
 async def upload_image(files: List[UploadFile] = File(...)):
@@ -299,7 +298,7 @@ async def delete_image(filename: str):
 @app.post("/csv/", dependencies=[Depends(get_read_permission_user)])
 def get_filtered_data_csv(query_filters: dict[NodeLabel, list[Filter]]):
     data, _ = db.get_pieces_with_components_paginated_filtered(query_filters, 0, -1)
-    df = pd.json_normalize(data, sep="_")
+    df = pd.json_normalize(data, sep=".")
     # # Set order in which excel df columns will be presented
     # desired_order = []
     # for col in desired_order:
@@ -307,7 +306,7 @@ def get_filtered_data_csv(query_filters: dict[NodeLabel, list[Filter]]):
     #         df[col] = np.nan  # Add missing columns with NaN values
 
     # # Rearrange the DataFrame columns to match the desired order
-    # df = df[desired_order]
+    # df = df[desired_order].rename()
 
     #print(df)
     buffer = io.BytesIO()
