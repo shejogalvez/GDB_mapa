@@ -70,8 +70,16 @@ def request_to_log(request: Request, user: UserInDB, body: NodeCreate, node_id: 
 
 def upload_file(file: UploadFile, relative_path: str):
     file_path = os.path.join(UPLOAD_DIR, relative_path)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        
+    # Get the absolute destination path
+    destination_path = os.path.abspath(file_path)
+
+    # Ensure the destination folder exists; create it if it doesn't
+    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+
+    # Copy the file to the destination
+    with open(destination_path, 'wb') as dest_file:
+        shutil.copyfileobj(file.file, dest_file)
 
 def attach_files_subnode_to_node(node_data: NodeCreate, files: List[UploadFile], subnode_label: NodeLabel = "imagen", prefix: str = ""):
     if not files: return
@@ -205,7 +213,7 @@ def add_piece(request: Request,
     parsed_component_interventions = parse_component_files(component_interventions, len(node_create.components))
     for i, component in enumerate(node_create.components):
         attach_files_subnode_to_node(component, parsed_component_images[i])
-        attach_files_subnode_to_node(component, parsed_component_interventions[i], subnode_label='intervencion')
+        attach_files_subnode_to_node(component, parsed_component_interventions[i], subnode_label='intervencion', prefix='intervenciones/')
     #print(node_create.components)
     try:
         result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
@@ -237,7 +245,7 @@ async def add_component(request: Request,
         images that will attach to the component node
     """
     attach_files_subnode_to_node(node_create, images)
-    attach_files_subnode_to_node(node_create, interventions, subnode_label='intervencion')
+    attach_files_subnode_to_node(node_create, interventions, subnode_label='intervencion', prefix='intervenciones/')
     result = db.create_update_component(piece_id, node_create.id, node_create.connected_nodes, node_create.properties)
     #print(result)
     log = request_to_log(request, user, node_create, piece_id)
