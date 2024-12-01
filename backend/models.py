@@ -59,7 +59,7 @@ class Log(BaseModel):
     username: str
     endpoint: str
     request_method: str
-    request_body: str
+    request_body: str = ""
     node_elementid: str
 
 class RoleEnum(Enum):

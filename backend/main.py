@@ -308,12 +308,16 @@ async def update_piece(request: Request,
     return add_piece(request, node_create, user, images, component_images)
 
 @app.delete("/images/", dependencies=[Depends(get_write_permission_user)])
-async def delete_image(filename: str):
+async def delete_image(request: Request, user: Annotated[UserInDB, Depends(get_current_user)], filename: str, piece_id: str):
     try:
         path = os.path.join(UPLOAD_DIR, filename)
         print(path)
-        db.delete_image_by_filename(filename)
+        with db.Tx() as tx:
+            db.delete_image_by_filename(filename, tx=tx)
+            log = Log(username=user.username, endpoint=request.url.path, request_method=request.method, node_elementid=piece_id)
+            logdb = db.create_log(log, tx=tx)
         os.remove(path)
+        return logdb
     except OSError:
         return HTTPException(status_code=404, detail=f"image to delete was not found")
 

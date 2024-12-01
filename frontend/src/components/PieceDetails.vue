@@ -6,7 +6,7 @@
         <h1>Info pieza</h1>
         <!-- User Image -->
         <div v-for="(img, index) in piece.imagenes" class="user-image">
-          <DeletableImage @imageDeleted="() => piece.imagenes.splice(index)" :imageId="img.filename">pieza imagen</DeletableImage>
+          <DeletableImage @imageDeleted="removeFromArray(piece.imagenes, index)" :imageId="img.filename" :pieceId="piece.id" :key="index"/>
         </div>
         
         <!-- User Information -->
@@ -23,20 +23,22 @@
         </div>
 
         <h1>Info componentes</h1>
-        <div v-for="(component, index) in piece.components" class="user-info">
+        <template v-for="(component, index) in piece.components">
           <h3>componente {{ index+1 }}</h3>
           <div v-for="(img, index) in component.imagenes" class="user-image">
-            <DeletableImage @imageDeleted="() => component.imagenes.splice(index)" :imageId="img.filename">pieza imagen</DeletableImage>
+            <DeletableImage @imageDeleted="removeFromArray(component.imagenes, index)" :imageId="img.filename" :pieceId="piece.id" :key="img.filename"/>
           </div>
-          <template v-for="(val, key, idx) in component.properties">
-            <p><strong>{{ key }}:</strong> {{ val }} </p>
-          </template>
-          <p v-if="component.ubicacion"><strong>ubicacion:</strong> {{ component.ubicacion.name }} </p>
-          <template v-for="(val, key, idx) in component.forma">
-            <p><strong>{{ key }}:</strong> {{ val }} </p>
-          </template>
+          <div class="user-info">
+            <template v-for="(val, key, idx) in component.properties">
+              <p><strong>{{ key }}:</strong> {{ val }} </p>
+            </template>
+            <p v-if="component.ubicacion"><strong>ubicacion:</strong> {{ component.ubicacion.name }} </p>
+            <template v-for="(val, key, idx) in component.forma">
+              <p><strong>{{ key }}:</strong> {{ val }} </p>
+            </template>
+          </div>
           <br><br>
-        </div>
+        </template>
       </div>
     </div>
   </template>
@@ -112,6 +114,9 @@
       },
       closeModal() {
         this.showModal = false;  // Close the modal
+      },
+      removeFromArray(array, index) {
+        array.splice(index, 1);
       },
     },
   };

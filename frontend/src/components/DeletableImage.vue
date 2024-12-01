@@ -38,6 +38,10 @@
         type: String,
         required: true,
       },
+      pieceId: {
+        type: String,
+        required: true
+      },
     },
     setup(props, ctx) {
       const isModalOpen = ref(false);
@@ -50,7 +54,12 @@
       // Sends delete request for the image
       const deleteImage = async () => {
         try {
-          const response = await axios.delete(`http://localhost:8000/images/`, {params: {filename: props.imageId}});
+          const response = await axios.delete(`http://localhost:8000/images/`, {params: 
+            {
+              filename: props.imageId,
+              piece_id: props.pieceId,
+            }
+          });
           // Emit an event to notify parent component about the deletion
           ctx.emit('imageDeleted');
           console.log(response);
