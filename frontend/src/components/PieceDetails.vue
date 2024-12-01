@@ -32,7 +32,7 @@
             <template v-for="(val, key, idx) in component.properties">
               <p><strong>{{ key }}:</strong> {{ val }} </p>
             </template>
-            <p v-if="component.ubicacion"><strong>ubicacion:</strong> {{ component.ubicacion.name }} </p>
+            <p v-if="component.ubicacion"><strong>ubicacion:</strong> {{ component.ubicacionpath }} </p>
             <template v-for="(val, key, idx) in component.forma">
               <p><strong>{{ key }}:</strong> {{ val }} </p>
             </template>

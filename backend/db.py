@@ -274,9 +274,10 @@ def get_piece_components(piece_id):
     MATCH (p) -[:compuesto_por]-> (componente:componente) WHERE elementid(p) = $piece_id
     OPTIONAL MATCH (componente) -[]-> (forma:forma)
     OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
+    OPTIONAL MATCH path = (:ubicacion {name: "root"}) (()-[:ubicacion_contiene]->()){0,4} (ubicacion)
     OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
-    WITH componente, forma, ubicacion, collect(imagen) as imagenes
-    RETURN DISTINCT elementid(componente) as id, componente, forma, ubicacion, imagenes"""
+    WITH componente, forma, ubicacion, collect(imagen) as imagenes, apoc.text.join([node in nodes(path) | node.name], " -> ") as ubicacionpath 
+    RETURN DISTINCT elementid(componente) as id, componente, forma, ubicacion, ubicacionpath, imagenes"""
     with GraphDatabase.driver(uri, auth=(username, password)) as driver:
         with driver.session() as session:
             with session.begin_transaction() as tx:
