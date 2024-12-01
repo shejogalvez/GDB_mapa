@@ -65,7 +65,7 @@ if not os.path.exists(UPLOAD_DIR):
 def request_to_log(request: Request, user: UserInDB, body: NodeCreate, node_id: str) -> Log:
     endpoint = request.url.path
     request_method = request.method
-    print(f"{user.username=} {endpoint=}", f"{request_method=}", f"{body.model_dump_json()=} {body.id=}")
+    # print(f"{user.username=} {endpoint=}", f"{request_method=}", f"{body.model_dump_json()=} {body.id=}")
     return Log(username=user.username, endpoint=endpoint, request_method=request_method, request_body=body.model_dump_json(), node_elementid=node_id)
 
 def upload_file(file: UploadFile, relative_path: str):
@@ -215,14 +215,15 @@ def add_piece(request: Request,
         attach_files_subnode_to_node(component, parsed_component_images[i])
         attach_files_subnode_to_node(component, parsed_component_interventions[i], subnode_label='intervencion', prefix='intervenciones/')
     #print(node_create.components)
-    try:
-        result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
-    except ConstraintError:
-        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Número de inventario repetido")
-    #print(result)
-    log = request_to_log(request, user, node_create, result[0]['id'])
-    logdb = db.create_log(log)
-    print(logdb)
+    with db.Tx() as tx:
+        try:
+            result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties, tx=tx)
+        except ConstraintError:
+            return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Número de inventario repetido")
+        #print(result)
+        log = request_to_log(request, user, node_create, result[0]['id'])
+        logdb = db.create_log(log, tx=tx)
+        print(logdb)
     return result
 
 @app.put("/add-component", dependencies=[Depends(get_write_permission_user)])
@@ -246,29 +247,27 @@ async def add_component(request: Request,
     """
     attach_files_subnode_to_node(node_create, images)
     attach_files_subnode_to_node(node_create, interventions, subnode_label='intervencion', prefix='intervenciones/')
-    result = db.create_update_component(piece_id, node_create.id, node_create.connected_nodes, node_create.properties)
-    #print(result)
-    log = request_to_log(request, user, node_create, piece_id)
-    logdb = db.create_log(log)
+    with db.Tx() as tx:
+        result = db.create_update_component(piece_id, node_create.id, node_create.connected_nodes, node_create.properties, tx=tx)
+        #print(result)
+        log = request_to_log(request, user, node_create, piece_id)
+        logdb = db.create_log(log, tx=tx)
     return result
 
 @app.delete("/pieces/", dependencies=[Depends(get_write_permission_user)])
 async def delete_piece(node_id: str):
-    with db.get_db_driver() as driver:
-        with driver.session() as session:
-            with session.begin_transaction() as tx:
-                files_to_delete = db.detete_piece(tx, node_id)
-                for image in files_to_delete:
-                    filename = image["filename"]
-                    if (filename):
-                        # print(filename)
-                        try:
-                            path = os.path.join(UPLOAD_DIR, filename)
-                            os.remove(path)
-                        except OSError:
-                            pass
-                            # return HTTPException(status_code=404, detail=f"image to delete was not found")
-                return 
+    files_to_delete = db.detete_piece(node_id)
+    for image in files_to_delete:
+        filename = image["filename"]
+        if (filename):
+            # print(filename)
+            try:
+                path = os.path.join(UPLOAD_DIR, filename)
+                os.remove(path)
+            except OSError:
+                pass
+                # return HTTPException(status_code=404, detail=f"image to delete was not found")
+    return 
 
 @app.post("/upload-image/", dependencies=[Depends(get_write_permission_user)])
 async def upload_image(files: List[UploadFile] = File(...)):

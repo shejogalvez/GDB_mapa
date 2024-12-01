@@ -8,6 +8,22 @@ uri = f"bolt://{ os.getenv("NEO4J_HOSTNAME", "localhost") }:7687"  # Bolt URI of
  
 username, password = os.getenv("NEO4J_AUTH").split('/')  # Your Neo4j username
 
+class Tx():
+    driver: Driver = None
+    session = None
+    tx: Transaction = None
+
+    def __enter__(self) -> Transaction:
+        self.driver = get_db_driver()
+        self.session = self.driver.session()
+        self.tx = self.session.begin_transaction()
+        return self.tx
+    
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.tx.__exit__(exc_type, exc_value, exc_tb)
+        self.session.__exit__(exc_type, exc_value, exc_tb)
+        self.driver.close()
+
 class ComponentCreationException(Exception):
     pass
 
@@ -195,25 +211,26 @@ def get_pieces_info_paginated_filtered(query_filters: dict[str, list[Filter]], s
     count = run_query(query_count, skip=skip, limit=limit, **query_kwargs)[0]
     return result, count
 
-def get_pieces_with_components_paginated(skip: int, limit: int):
-    pre_query= f"MATCH (pieza: pieza) {MATCH_RELATED_NODES}"
-    get_components_sub_query = """
-    CALL {
-        WITH *
-        MATCH (pieza) -[:compuesto_por]-> (componente:componente)
-        OPTIONAL MATCH (componente) -[]-> (forma:forma)
-        OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
-        OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
-        WITH componente, forma, ubicacion, collect(imagen) as imagenes
-        RETURN DISTINCT {id:elementid(componente), componente:componente, forma:forma, ubicacion:ubicacion, imagenes:imagenes} as componentes
-    }
-    """
-    post_query = f"RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}, componentes {skip_limit_clause(limit)}"
-    query = pre_query + get_components_sub_query + post_query
-    result = run_query(query, skip=skip, limit=limit)
-    query_count = "MATCH (pieza:pieza) RETURN count(*) as count"
-    count = run_query(query_count, skip=skip, limit=limit)[0]
-    return result, count
+# def get_pieces_with_components_paginated(skip: int, limit: int):
+#     pre_query= f"MATCH (pieza: pieza) {MATCH_RELATED_NODES}"
+#     get_components_sub_query = """
+#     CALL {
+#         WITH *
+#         MATCH (pieza) -[:compuesto_por]-> (componente:componente)
+#         OPTIONAL MATCH (componente) -[]-> (forma:forma)
+#         OPTIONAL MATCH (componente) -[]-> (ubicacion:ubicacion)
+#         OPTIONAL MATCH ubicacion_path = (:ubicacion {name: "root"}) (()-[:ubicacion_contiene]->()){0,4} (ubicacion)
+#         OPTIONAL MATCH (componente) -[]-> (imagen:imagen)
+#         WITH componente, forma, ubicacion_path, collect(imagen.filename) as imagenes
+#         RETURN DISTINCT {id:elementid(componente), componente:componente, forma:forma, ubicacion:ubicacion_path, imagenes:apoc.text.join(imagenes, ",\n")} as componentes
+#     }
+#     """
+#     post_query = f"RETURN elementid(pieza) as id, pieza, {RETURN_RELATED_NODES}, componentes {skip_limit_clause(limit)}"
+#     query = pre_query + get_components_sub_query + post_query
+#     result = run_query(query, skip=skip, limit=limit)
+#     query_count = "MATCH (pieza:pieza) RETURN count(*) as count"
+#     count = run_query(query_count, skip=skip, limit=limit)[0]
+#     return result, count
 
 def get_pieces_with_components_paginated_filtered(query_filters: dict[str, list[Filter]], skip: int, limit: int):
 
@@ -265,7 +282,7 @@ def get_piece_components(piece_id):
             with session.begin_transaction() as tx:
                 components = tx.run(query, piece_id=piece_id).data()
                 piece = get_piece_by_elementid(piece_id, tx)
-                print(piece, components)
+                # print(piece, components)
     return piece, components
 
 def get_piece_by_elementid(piece_id, tx:Transaction=None):
@@ -332,7 +349,7 @@ def create_update_component(piece_id: str, component_id: str | None, subnodes: l
     except (IndexError, KeyError):
         raise ComponentCreationException('non existant piece_id or component_id value')
 
-def create_update_piece(piece_id: str|None, components: list[NodeCreate], subnodes: list[SubNode], properties: list[dict] ):
+def create_update_piece(piece_id: str|None, components: list[NodeCreate], subnodes: list[SubNode], properties: list[dict], tx:Transaction =None):
     """
     creates or update a piece if ``piece_id`` already exists, sets ``properties`` of piece and then creates or update each component
 
@@ -376,7 +393,7 @@ def delete_component(tx: Transaction, component_id: str):
             """
     return tx.run(query, nodeId=component_id)
 
-def detete_piece(tx: Transaction, id: str):
+def detete_piece(id: str, tx: Transaction=None):
     """Deletes pieza, deletes edges and nodes that depend on pieza and returns filenames of files to be deleted"""
     query = """
             MATCH (n {id: $nodeId})
@@ -387,7 +404,7 @@ def detete_piece(tx: Transaction, id: str):
             DETACH DELETE f, n, c, i
             RETURN filename
             """
-    return tx.run(query, nodeId=id).data()
+    return run_query(query, nodeId=id, tx=tx)
 
 def delete_user(username: str):
     query = """
@@ -412,12 +429,17 @@ def delete_node_by_id_key(labels: list[str], key: str, val: Any, tx: Transaction
             """
     return run_query(query, key=key, val=val, tx=tx)
 
-def create_log(log: Log):
+def create_log(log: Log, tx: Transaction=None):
     """creates a log connection between"""
     query = """
             MATCH (user :user {username: $username}), (n) WHERE elementid(n) = $node_id
             CREATE (n) <-[l:log {endpoint: $endpoint, request_method: $request_method, request_body: $request_body}]- (user)
-            RETURN l
+            RETURN properties(l)
             """
-    result = run_query(query, username=log.username, endpoint=log.endpoint, request_method=log.request_method, request_body=log.request_body, node_id=log.node_elementid)
+    result = run_query(query, username=log.username, 
+                       endpoint=log.endpoint, 
+                       request_method=log.request_method, 
+                       request_body=log.request_body, 
+                       node_id=log.node_elementid, 
+                       tx=tx)
     return result
