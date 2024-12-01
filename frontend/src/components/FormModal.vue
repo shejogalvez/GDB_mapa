@@ -179,6 +179,7 @@ export default {
             default: "Crear Pieza"
         }
     },
+    emits: ['success', 'close'],
     components: {
       TreeDropdown,
       VDateInput,
@@ -192,14 +193,6 @@ export default {
          * @property {string} name
          * @property {Array<Ubicacion>} ubicacion_contiene
          */
-
-        /** @typedef {object} SubNode 
-         * @property {any} id
-         * @property {string} id_key
-         * @property {string} relation_label
-         * @property {string} node_label
-         * @property {Object} properties
-        */
         return {
             pieceStore: useStore(),
             componentsToDelete: [],
@@ -329,6 +322,7 @@ export default {
                 console.log(response);
                 if (!response.data.status_code){
                     this.exitForm();
+                    this.$emit('success');
                 }
                 else {
                     alert(response.data.detail);
@@ -344,6 +338,7 @@ export default {
                 connected_nodes: {forma: {}},
                 properties: {},
                 uploadedFiles: [],
+                uploadedInterventions: [],
                 previewImages: []
             });
         },

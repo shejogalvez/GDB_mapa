@@ -13,6 +13,7 @@ export const useStore = defineStore('store', {
                 connected_nodes: {forma: {}},
                 properties: {},
                 uploadedFiles: [],
+                uploadedInterventions: [],
                 previewImages: []
             }],
             // data fetched

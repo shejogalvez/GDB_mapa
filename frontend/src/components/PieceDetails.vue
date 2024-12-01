@@ -1,7 +1,7 @@
 <template>
     <div class="user-details-container">
       <button @click="openModal" class="modern-button">editar pieza</button>
-      <FormModal :isVisible="showModal" title="Editar pieza" @close="()=>{showModal = false}" />
+      <FormModal :isVisible="showModal" title="Editar pieza" @close="()=>{showModal = false}" @success="$forceUpdate"/>
       <div class="user-details-card">
         <h1>Info pieza</h1>
         <!-- User Image -->
@@ -93,6 +93,7 @@
           component.connected_nodes = connected_nodes;
           component.properties = cprops;
           component.uploadedFiles = [];
+          component.uploadedInterventions = [];
           component.previewImages = [];
         }
         pieceData.components = componentsData;
