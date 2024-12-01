@@ -69,7 +69,7 @@
                         
                         <!-- Multiple Image Upload -->
                         <label for="imagen"> subir imagen piezas</label>
-                        <input type="file" id="imagen" name="imagen" @change="handleComponentFileUpload(pieceData, $event)" multiple></input>
+                        <input type="file" id="imagen" name="imagen" @change="handleComponentImageUpload(pieceData, $event)" multiple></input>
 
                         <!-- Preview Images -->
                         <div class="image-preview">
@@ -123,8 +123,8 @@
                             
                             <!-- Multiple Image Upload -->
                             <br><br>
-                            <label :for="`image${i}`"> subir imagen componente {{ i }}</label>  
-                            <input type="file" :id="`image${i}`" :name="`image${i}`" @change="handleComponentFileUpload(component, $event)" multiple></input>
+                            <label :for="`image${i}`"> subir imagen componente {{ i }}</label><br>
+                            <input type="file" :id="`image${i}`" :name="`image${i}`" @change="handleComponentImageUpload(component, $event)" multiple></input>
 
                             <!-- Preview Images -->
                             <div class="image-preview">
@@ -132,6 +132,14 @@
                                     <img :src="image" alt="Image Preview" class="preview">
                                 </div>
                             </div>
+                            
+                            <br>
+                            <label :for="`image${i}`"> agregar archivos de intervención a componente {{ i }}</label><br>
+                            <input type="file" :id="`intervention${i}`" :name="`intervention${i}`" @change="handleComponentDocumentsUpload(component, $event)" multiple></input>
+                            <div v-for="(file, index) in component.uploadedInterventions" :key="index">
+                                <span>{{ file.name }}</span>
+                            </div>
+                            <br><br>
                         </div>
                         <div class="buttons-div">
                             <button type="button" @click="agregarComponente">+ componente</button>
@@ -242,7 +250,7 @@ export default {
             this.pieceStore.$reset();
             this.$emit('close');
         },
-        handleComponentFileUpload(component, event) {
+        handleComponentImageUpload(component, event) {
             component.uploadedFiles = event.target.files;
             component.previewImages = [];
 
@@ -254,6 +262,9 @@ export default {
                 reader.readAsDataURL(component.uploadedFiles[i]);
             }
             //console.log(component.uploadedFiles);
+        },
+        handleComponentDocumentsUpload(component, event) {
+            component.uploadedInterventions = event.target.files;
         },
         /**@param {Object} connected_nodes_dict 
          * @returns {SubNode} */
@@ -299,10 +310,14 @@ export default {
             }
             for (let i=0; i<pieceData.components.length; i++) {
                 const component = pieceData.components[i];
-                console.log(component);
+                //console.log(component);
                 for (let j=0; j<component.uploadedFiles.length; j++) {
-                    console.log(component.uploadedFiles[j])
+                    //console.log(component.uploadedFiles[j])
                     data.append('component_images', component.uploadedFiles[j], `${i}_${j}_${component.uploadedFiles[j].name}`)
+                }
+                for (let j=0; j<component.uploadedInterventions.length; j++) {
+                    //console.log(component.uploadedFiles[j])
+                    data.append('component_interventions', component.uploadedInterventions[j], `${i}_${j}_${component.uploadedInterventions[j].name}`)
                 }
             }
             try {
