@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import json
 
 #NodeLabel: labels de nodos válidos para hacer match al momento de hacer queries
-NodeLabel = Literal["pieza", "pais", "localidad", "exposicion", "cultura", "imagen", "componente", "forma", "ubicacion"]
+NodeLabel = Literal["pieza", "pais", "localidad", "exposicion", "cultura", "imagen", "componente", "forma", "ubicacion", "intervencion"]
 
 # NODES_RELATIONS: diccionario para asignar labels de relaciones entre tipos de nodo
 NODES_RELATIONS: dict[tuple[NodeLabel, NodeLabel], str] = {
@@ -20,6 +20,7 @@ NODES_RELATIONS: dict[tuple[NodeLabel, NodeLabel], str] = {
     ('componente', 'imagen'): 'tiene_imagen',
     ('componente', 'forma'): 'tiene_forma',
     ('componente', 'ubicacion'): 'ubicacion_componente',
+    ('componente', 'intervencion'): 'tiene_intervencion',
     ('ubicacion', 'ubicacion'): 'ubicacion_contiene',
 }
 

@@ -19,7 +19,7 @@ import numpy as np
 import db
 import user
 from user import get_admin_permission_user, get_read_permission_user, get_write_permission_user, get_current_user, add_user
-from models import PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum, NodeLabel, UserForm
+from models import PieceCreate, Log, UserInDB, NodeCreate, SubNode, Filter, RoleEnum, NodeLabel, UserForm, NODES_RELATIONS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -73,14 +73,24 @@ def upload_file(file: UploadFile, relative_path: str):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-def attach_images_to_node(node_data: NodeCreate, images: List[UploadFile], prefix: str = ""):
-    if not images: return
-    for file in images:
+def attach_files_subnode_to_node(node_data: NodeCreate, files: List[UploadFile], subnode_label: NodeLabel = "imagen", prefix: str = ""):
+    if not files: return
+    if type(node_data) == PieceCreate:
+        mainnode_label = 'pieza'
+    else:
+        mainnode_label = 'componente'
+    relation_label = NODES_RELATIONS[(mainnode_label, subnode_label)]
+    for file in files:
         validate_file_size_type(file)
         relative_path = f"{prefix}_{str(datetime.now())}{file.filename}"
         upload_file(file, relative_path)
         file_properties = {"size" : file.size, "name" : file.filename}
-        file_node = SubNode(node_id= relative_path, properties=file_properties, relation_label="tiene_imagen", node_label="imagen", id_key='filename', method='CREATE')
+        file_node = SubNode(node_id= relative_path, 
+                            properties=file_properties, 
+                            relation_label=relation_label, 
+                            node_label=subnode_label, 
+                            id_key='filename', 
+                            method='CREATE')
         node_data.connected_nodes.append(file_node)
 
 def parse_component_files(files: list[UploadFile], n_components: int) -> list[list[UploadFile]]:
@@ -173,7 +183,8 @@ def add_piece(request: Request,
               node_create: Annotated[PieceCreate, Body(...)], 
               user: Annotated[UserInDB, Depends(get_current_user)], 
               images: Annotated[list[UploadFile], File()] = None,
-              component_images: Annotated[list[UploadFile], File()] = None):
+              component_images: Annotated[list[UploadFile], File()] = None,
+              component_interventions: Annotated[list[UploadFile], File()] = None,):
     """
     Creates/Updates a piece node, creates connections based on ``SubNode``'s specifications and Creates/Updates Components
     attached to this piece on the same transaction, images files are saved in `UPLOAD_DIR` and nodes created are connected 
@@ -189,10 +200,12 @@ def add_piece(request: Request,
         images that will attach to the piece node
     """
     if len(node_create.components) < 1: return HTTPException(422, detail="Se espera al menos 1 componente para esta pieza")
-    attach_images_to_node(node_create, images)
+    attach_files_subnode_to_node(node_create, images)
     parsed_component_images = parse_component_files(component_images, len(node_create.components))
+    parsed_component_interventions = parse_component_files(component_interventions, len(node_create.components))
     for i, component in enumerate(node_create.components):
-        attach_images_to_node(component, parsed_component_images[i])
+        attach_files_subnode_to_node(component, parsed_component_images[i])
+        attach_files_subnode_to_node(component, parsed_component_interventions[i], subnode_label='intervencion')
     #print(node_create.components)
     try:
         result = db.create_update_piece(node_create.id, node_create.components, node_create.connected_nodes, node_create.properties)
@@ -209,7 +222,8 @@ async def add_component(request: Request,
                         user: Annotated[UserInDB, Depends(get_current_user)], 
                         node_create: Annotated[NodeCreate, Form(...)],
                         piece_id: Annotated[str, Form(...)],
-                        images: list[UploadFile] = None):
+                        images: list[UploadFile] = None,
+                        interventions: list[UploadFile] = None,):
     """
     endpoint expects paramaters encoded as multipart form 
 
@@ -222,7 +236,8 @@ async def add_component(request: Request,
     images: list[UploadFile]
         images that will attach to the component node
     """
-    attach_images_to_node(node_create, images)
+    attach_files_subnode_to_node(node_create, images)
+    attach_files_subnode_to_node(node_create, interventions, subnode_label='intervencion')
     result = db.create_update_component(piece_id, node_create.id, node_create.connected_nodes, node_create.properties)
     #print(result)
     log = request_to_log(request, user, node_create, piece_id)
