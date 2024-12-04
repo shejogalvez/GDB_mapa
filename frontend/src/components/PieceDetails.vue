@@ -1,16 +1,16 @@
 <template>
-    <div class="user-details-container">
+    <div class="piece-details-container">
       <button @click="openModal" class="modern-button">editar pieza</button>
-      <FormModal :isVisible="showModal" title="Editar pieza" @close="()=>{showModal = false}" @success="$forceUpdate"/>
-      <div class="user-details-card">
+      <FormModal :isVisible="showModal" title="Editar pieza" @close="()=>{showModal = false}" @success="fetchDetails"/>
+      <div class="piece-details-card">
         <h1>Info pieza</h1>
         <!-- User Image -->
-        <div v-for="(img, index) in piece.imagenes" class="user-image">
+        <div v-for="(img, index) in piece.imagenes" class="piece-image">
           <DeletableImage @imageDeleted="removeFromArray(piece.imagenes, index)" :imageId="img.filename" :pieceId="piece.id" :key="index"/>
         </div>
         
         <!-- User Information -->
-        <div class="user-info">
+        <div class="piece-info">
           <template v-for="(val, key) in piece.properties">
             <p>
               <strong>{{ key }}:</strong> {{ val }} 
@@ -25,10 +25,10 @@
         <h1>Info componentes</h1>
         <template v-for="(component, index) in piece.components">
           <h3>componente {{ index+1 }}</h3>
-          <div v-for="(img, index) in component.imagenes" class="user-image">
+          <div v-for="(img, index) in component.imagenes" class="piece-image">
             <DeletableImage @imageDeleted="removeFromArray(component.imagenes, index)" :imageId="img.filename" :pieceId="piece.id" :key="img.filename"/>
           </div>
-          <div class="user-info">
+          <div class="piece-info">
             <template v-for="(val, key, idx) in component.properties">
               <p><strong>{{ key }}:</strong> {{ val }} </p>
             </template>
@@ -44,7 +44,6 @@
   </template>
   
   <script>
-  import axios from 'axios';
   import { useStore } from '@/stores/store';
   import DeletableImage from './DeletableImage.vue';
   
@@ -58,56 +57,21 @@
     components: {
       DeletableImage
     },
-    async mounted() {
-      const pieceId = this.$route.params.id;  // Get user ID from the route
+    mounted() {
       try {
-        const response = await axios.get(`http://localhost:8000/components/`, {params: {
-          piece_id: pieceId,
-        }});
-        console.log(response);
-        let pieceData = response.data[0]
-        const properties = pieceData['pieza'];
-        delete pieceData['pieza'];
-        const connected_nodes = {}
-        for (const key of ['pais', 'localidad', 'exposicion', 'cultura']) {
-          const val = pieceData[key];
-          if (val) {
-            connected_nodes[key] = val.name;
-          }
-        }
-        pieceData.connected_nodes = connected_nodes;
-        pieceData.properties = properties;
-        pieceData.uploadedFiles = [];
-        pieceData.previewImages = [];
-        let componentsData = response.data[1]
-        for (const component of componentsData){
-          const cprops = component['componente'];
-          delete component['componente'];
-          const connected_nodes = {forma: {}}
-          for (const key of ['forma', 'ubicacion']) {
-          const val = component[key];
-            if (val) {
-              connected_nodes[key] = val;
-            }
-          }
-          component.connected_nodes = connected_nodes;
-          component.properties = cprops;
-          component.uploadedFiles = [];
-          component.uploadedInterventions = [];
-          component.previewImages = [];
-        }
-        pieceData.components = componentsData;
-        
-        this.piece = pieceData
-        console.log(this.piece);
+        this.fetchDetails();
+        //console.log(this.piece);
       } catch (error) {
         console.log(this.$route.params);
-        console.error('Error fetching user details:', error);
+        console.error('Error fetching piece details:', error);
       }
     },
     methods: {
-      // Fetch user details from the backend using an ID
+      // Fetch piece details from the backend using an ID
       async fetchDetails() {
+        const pieceId = this.$route.params.id;  // Get piece ID from the route
+        await useStore().UpdateFromPieceId(pieceId);
+        this.piece = useStore().currentPiece;
       },
       openModal() {
         useStore().$patch({currentPiece: {...this.piece}}); // copies fetched data to form
@@ -124,14 +88,14 @@
   </script>
   
   <style scoped>
-  .user-details-container {
+  .piece-details-container {
     display: flex;
     justify-content: center;
     min-height: 100vh;
     background-color: #f4f4f9;
   }
   
-  .user-details-card {
+  .piece-details-card {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -143,7 +107,7 @@
     text-align: center;
   }
   
-  .user-image img {
+  .piece-image img {
     border-radius: 50%;
     width: 150px;
     height: 150px;
@@ -153,7 +117,7 @@
     margin: 0 15pt;
   }
   
-  .user-info {
+  .piece-info {
     color: #333;
   }
   
