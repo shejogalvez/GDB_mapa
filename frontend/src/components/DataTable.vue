@@ -11,6 +11,12 @@
               <v-btn v-bind="props" icon="mdi-download" @click="downloadCsv"></v-btn>
             </template>
           </v-tooltip>
+
+          <v-tooltip text="cerrar sesión" location="end">
+            <template v-slot:activator="{ props }">
+              <v-btn v-bind="props" icon="mdi-logout" @click="logout"></v-btn>
+            </template>
+          </v-tooltip>
         </template>
       </v-app-bar>
       
@@ -32,7 +38,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in filteredRows" :key="row.pieza.id">
+          <tr v-for="row in rows" :key="row.pieza.id">
             <td><button class="modern-button" @click="goToDetails(row)"> </button> </td>
             <td v-for="(val, key) in property_columns">{{ row.pieza[key] }}</td>
 
@@ -41,7 +47,7 @@
             <td>{{ row.cultura?.name }}</td>
             <td>{{ row.exposicion }}</td>
           </tr>
-          <template v-if="filteredRows.length == 0">
+          <template v-if="rows.length == 0">
             <tr>
               <td colspan="9999" style="height: 250px;">
                     No hay piezas con estos filtros
@@ -86,27 +92,26 @@
     data() {
       return {
         rows: [],
-        filteredRows: [],
         showModal: false,
         currentPage: 0,
         limitResults: 75,
         totalPages: 50,
         property_columns: {
-          id: "Numero de Inventario",
-          numero_de_registro_anterior :"Número de registro anterior",
-          coleccion :"Coleccion",
-          clasificacion :"SURDOC",
-          conjunto :"Clasificacion",
-          autor :"Conjunto",
-          fecha_de_creacion :"Autor",
-          contexto_historico :"Fecha de Creación",
-          notas_investigacion :"Contexto Historico",
-          bibliografia :"Notas de Investigacion",
-          avaluo :"Bibliografia",
-          procedencia :"Avaluo",
-          donante :"Procedencia",
-          fecha_ingreso :"Donante",
-          fecha_ingreso_text :"Fecha ingreso"
+          id:                           "Numero de Inventario",
+          numero_de_registro_anterior : "Número de registro anterior",
+          coleccion :                   "Coleccion",
+          surdoc :                      "SURDOC",
+          clasificacion :               "Clasificacion",
+          conjunto :                    "Conjunto",
+          autor :                       "Autor",
+          fecha_de_creacion :           "Fecha de Creación",
+          contexto_historico :          "Contexto Historico",
+          notas_investigacion :         "Notas de Investigacion",
+          bibliografia :                "Bibliografia",
+          avaluo :                      "Avaluo",
+          procedencia :                 "Procedencia",
+          donante :                     "Donante",
+          fecha_ingreso :               "Fecha ingreso",
         }
       };
     },
@@ -127,7 +132,6 @@
           this.rows = response.data[0]; 
           this.totalPages = Math.floor(response.data[1]['count'] / this.limitResults)
           //console.log(this.totalPages)
-          this.filteredRows = this.rows; // Initialize the filtered rows
         } catch (error) {
           console.error('Error fetching data:', error);
         }
@@ -146,6 +150,7 @@
       async filterRows() {
         // Filter rows based on filterText input
         const filters = useFilterStore().$state.filters;
+        this.currentPage = 0;
         console.log(filters);
         try {
           const response = await axios.post('http://localhost:8000/pieces/', filters, 
@@ -155,7 +160,7 @@
               limit: this.limitResults
             }
           });
-          this.filteredRows = response.data[0]
+          this.rows = response.data[0]
           this.totalPages = Math.floor(response.data[1]['count'] / this.limitResults)
           console.log(this.totalPages)
         }
@@ -193,6 +198,11 @@
           alert("error exporting file");
         }
       }
+      ,
+      logout() {
+        localStorage.removeItem('token');
+        this.$router.push('/login');
+      },
 
     },
     computed: {
@@ -279,7 +289,10 @@
     font-weight: 600;
     box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
     transition: background-color 0.3s ease, transform 0.2s ease;
-    margin-right: 10pt;
+  }
+
+  .v-btn--icon {
+    margin-left: 10pt;
   }
   
   .modern-button:hover {
