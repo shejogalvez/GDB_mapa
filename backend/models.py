@@ -81,7 +81,7 @@ class UserInDB(User):
     salt: Optional[str] = "" #TODO: not optional
 
 # Operation: keywords que representan operacionaes para comparar campos al filtrar
-Operation = Literal['=', '>=', '<', '<=', '!=', '>', 'contains']
+Operation = Literal['=', '>=', '<', '<=', '!=', '>', 'contains', 'is null', 'is not null']
 
 class Filter(BaseModel):
     key: str 

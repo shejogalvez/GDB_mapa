@@ -10,12 +10,18 @@
       
       <div v-if="isOpen" class="filter-menu">
         <!-- Select Comparison Option -->
-        <v-select label="Comparison" :disabled="isFilterApplied" v-model="operation" density="compact" variant="outlined"
-            :items="['=', 'contains', '<', '>']">
+        <v-select label="Comparison" :disabled="isFilterApplied" v-model="operation_key" density="compact" variant="outlined"
+            :items="Object.keys(operation_map)">
         </v-select>
         
         <!-- Text Input -->
-        <v-text-field label="Value" :disabled="isFilterApplied" v-model="val" density="compact" variant="outlined"/>
+        <v-text-field 
+            label="Value" 
+            :disabled="isFilterApplied" 
+            v-model="val" density="compact" 
+            variant="outlined" 
+            v-if="!['is_empty', 'is_not_empty'].includes(operation_key)"
+        />
         
         <!-- Apply Filters Button -->
         <v-btn @click="applyFilters">{{isFilterApplied ? 'Remove Filters': 'Apply Filters' }}</v-btn>
@@ -45,7 +51,15 @@ export default  {
         return {
             isOpen: false,
             val: '',
-            operation: '',
+            operation_map: {
+                equals: '=',
+                contains: 'contains',
+                less_than: '<',
+                more_then: '>',
+                is_empty: 'is null',
+                is_not_empty: 'is not null',
+            },
+            operation_key: '',
             store: useFilterStore()
         }
     },
@@ -55,7 +69,7 @@ export default  {
             if (!this.isFilterApplied) {
                 const filterObj = {
                     key: this.property_label,
-                    operation: this.operation,
+                    operation: this.operation_map[this.operation_key],
                     val: this.val
                 }
                 store.$patch((state) => {
@@ -77,7 +91,7 @@ export default  {
         reset() {
             this.isOpen= false;
             this.val= '';
-            this.operation= '';
+            this.operation_key= '';
         }
     },
     computed: {
@@ -105,5 +119,8 @@ th {
 .filter-menu label {
     border-color: black;
     border: 5pt;
+}
+.v-text-field{
+    height: 30pt;
 }
 </style>

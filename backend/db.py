@@ -115,6 +115,10 @@ def parse_operation(operation_str: str, key: str) -> str:
             return f"< ${key}"
         case "contains":
             return f"contains(${key})"
+        case "is not null":
+            return "IS NOT NULL"
+        case "is null":
+            return "IS NULL"
 
 def parse_filters(args: dict[str, list[Filter]]) -> tuple[dict[str, str], dict[str, Any]]:
     if (not args): return {}, {}
