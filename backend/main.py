@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, List, Literal, IO
+from typing import Annotated, Optional, List, Literal, IO, Any
 from fastapi import FastAPI, Query, Depends, Body, File, Form, UploadFile, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -159,6 +159,10 @@ async def get_nodes(labels: Annotated[list[NodeLabel], Query()]):
 @app.get("/nodes/tree", dependencies=[Depends(get_read_permission_user)])
 async def get_nodes_tree(labels: Annotated[list[NodeLabel], Query()], rel_label: Annotated[str, Query()]):
     return db.get_nodes_as_tree(labels=labels, relation_label=rel_label)
+
+@app.delete("/nodes", dependencies=[Depends(get_read_permission_user)])
+async def delete_node(element_id: str):
+    return db.delete_node_by_elementid(element_id)
 
 @app.get("/pieces/", dependencies=[Depends(get_read_permission_user)])
 async def get_pieces(skip: int = 0, limit: int = 50):
@@ -345,3 +349,12 @@ def get_filtered_data_csv(query_filters: dict[NodeLabel, list[Filter]]):
     response.headers["Content-Disposition"] = "attachment; filename=export.xlsx"
     return response
 
+@app.put("/exposicion/", dependencies=[Depends(get_write_permission_user)])
+def add_exposicion(piezas_element_ids: Annotated[list[str], Body(...)],
+                   properties: Annotated[dict[str, Any], Body(...)]):
+    id_label_list = [(id, "pieza") for id in piezas_element_ids]
+    return db.create_node_and_connect_nodes_to_self("exposicion", id_label_list, **properties)
+
+@app.get("/test", response_model=datetime)
+def get_date() -> datetime:
+    return datetime(year=2024, month=12, day=16)

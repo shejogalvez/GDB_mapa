@@ -1,5 +1,5 @@
 from neo4j import EagerResult, GraphDatabase, Record, Transaction, Driver, Result
-from models import PieceCreate, NodeCreate, SubNode, Log, QueryFilter, Filter, NODES_RELATIONS
+from models import PieceCreate, NodeCreate, SubNode, Log, QueryFilter, Filter, NODES_RELATIONS, NodeLabel
 from typing import Any
 import os
 
@@ -49,8 +49,8 @@ def run_query(query: str, database_="neo4j", tx: Transaction = None, **kwarws) -
 
 ## UTILS ##
 # Parse dict and returns str to match properties in cypher query
-def parse_properties(**properties):
-    return "{"+{", ".join([f"{key}:${key}" for key in properties])}+"}"
+def parse_properties(properties: dict[str, Any]):
+    return "{" + ", ".join([f"{key}:${key}" for key in properties]) + "}"
 
 def parse_labels(labels: list[str]) -> str:
     return f":{' :'.join(labels)} " if labels else ""
@@ -156,7 +156,7 @@ def get_all_nodes_property_filter(tag: str | None = None, properties_filter: lis
     return result
 
 def get_nodes_without_tag_connected_to_node(exclude_tag: str, node_tag = "", **match_properties):
-    properties = parse_properties(**match_properties)
+    properties = parse_properties(match_properties)
     query = f"""MATCH (n {f":{node_tag}" if node_tag else ""} {properties}) -[]-> (c)
                 WHERE NOT (c: {exclude_tag})
                 RETURN c""" 
@@ -318,11 +318,24 @@ def create_user(username: str, hashed_password: str, salt: str, role: str):
     run_query(query)
 
 def create_node(tags: list[str] | None = None, **properties):
-    # TODO: validate tags (labels)
     tags = parse_labels(tags)
     properties_query = parse_properties(properties)
     query = f"CREATE (n{tags} {properties_query})"
     run_query(query, **properties)
+
+def create_node_and_connect_nodes_to_self(label: NodeLabel, connected_nodes_elementids: list[tuple[str, NodeLabel]], **properties):
+    print(properties)
+    properties_query = parse_properties(properties)
+    query = f"""CREATE (n :{label} {properties_query})"""
+    connect_to_nodes_query = "".join([
+        f"""
+        WITH n 
+        MATCH (other) WHERE elementid(other) = "{id}"
+        CREATE (other) -[:{NODES_RELATIONS[(other_label, label)]}]-> (n)"""
+    for id, other_label in connected_nodes_elementids])
+    query += connect_to_nodes_query
+    print(query)
+    return run_query(query, **properties)
 
 def get_user(username: str) -> Record | None:
     "Retorna el primer usuario con user.username == ``username``, None si no existe"
@@ -433,6 +446,13 @@ def delete_node_by_id_key(labels: list[str], key: str, val: Any, tx: Transaction
             DETACH DELETE n
             """
     return run_query(query, key=key, val=val, tx=tx)
+
+def delete_node_by_elementid(element_id: str, tx: Transaction = None):
+    query = f"""
+            MATCH (n) WHERE elementid(n) = $element_id
+            DETACH DELETE n
+            """
+    return run_query(query, element_id=element_id, tx=tx)
 
 def create_log(log: Log, tx: Transaction=None):
     """creates a log connection between"""
