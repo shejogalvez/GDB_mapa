@@ -32,13 +32,19 @@ export const useStore = defineStore('store', {
             }});
             let pieceData = response.data[0]
             const properties = pieceData['pieza'];
+            let date_properties = ['fecha_ingreso', 'fecha_ultima_modificacion']
+            for (const [key, val] of Object.entries(properties)) {
+                if (date_properties.includes(key)) {
+                    properties[key] = new Date(val);
+                }
+            }
             delete pieceData['pieza'];
             const connected_nodes = {}
             for (const key of ['pais', 'localidad', 'exposicion', 'cultura']) {
-            const val = pieceData[key];
-            if (val) {
-                connected_nodes[key] = val.name;
-            }
+                const val = pieceData[key];
+                if (val) {
+                    connected_nodes[key] = val.name;
+                }
             }
             pieceData.connected_nodes = connected_nodes;
             pieceData.properties = properties;
@@ -46,20 +52,26 @@ export const useStore = defineStore('store', {
             pieceData.previewImages = [];
             let componentsData = response.data[1]
             for (const component of componentsData){
-            const cprops = component['componente'];
-            delete component['componente'];
-            const connected_nodes = {forma: {}}
-            for (const key of ['forma', 'ubicacion']) {
-            const val = component[key];
-                if (val) {
-                connected_nodes[key] = val;
+                const cprops = component['componente'];
+                delete component['componente'];
+                const connected_nodes = {forma: {}}
+                
+                for (const [key, val] of Object.entries(cprops)) {
+                    if (date_properties.includes(key)) {
+                        cprops[key] = new Date(val);
+                    }
                 }
-            }
-            component.connected_nodes = connected_nodes;
-            component.properties = cprops;
-            component.uploadedFiles = [];
-            component.uploadedInterventions = [];
-            component.previewImages = [];
+                for (const key of ['forma', 'ubicacion']) {
+                const val = component[key];
+                    if (val) {
+                    connected_nodes[key] = val;
+                    }
+                }
+                component.connected_nodes = connected_nodes;
+                component.properties = cprops;
+                component.uploadedFiles = [];
+                component.uploadedInterventions = [];
+                component.previewImages = [];
             }
             pieceData.components = componentsData;
             
