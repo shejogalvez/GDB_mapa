@@ -4,10 +4,7 @@ import sys
 from pydantic import BaseModel, Field
 from uuid import UUID, uuid4
 
-# Set up the connection details
-uri = f"bolt://{ os.getenv("NEO4J_HOSTNAME", "localhost") }:7687"  # Bolt URI of your Neo4j server
- 
-username, password = os.getenv("NEO4J_AUTH").split('/')  # Your Neo4j username
+from datetime import datetime
 
 # Nombres de columnas excel que contine
 COL_PAIS      = "pais"
@@ -56,6 +53,44 @@ ATRIBUTOS_PIEZAS = [
 ]
 
 total = ["numero_de_inventario","letra","Revisión","numero_de registro_anterior","SURDOC","ubicacion","deposito","estante","caja_anterior","caja_actual","tipologia","coleccion","clasificacion","conjunto","nombre_comun","nombre_especifico","autor","filiacion_cultural","pais","localidad","fecha_de_creacion","descripcion_col","marcas_o_inscripciones","tecnica","materialidad","descripcion_cr","alto_o_largo_(cm)","ancho_(cm)","profundidad_(cm)","diametro_(cm)","espesor_(mm)","peso_(gr)","funcion","contexto_historico","bibliografia","iconografia","notas_investigacion","estado_genral_de_conservacion","responsable_conservacion","fecha_actualizacion_cr","comentarios_cr","exposiciones","avaluo","procedencia","donante","fecha_ingreso","responsable_coleccion","fecha_ultima_modificacion"]
+
+
+DATE_COLUMNS = ["fecha_ultima_modificacion", "fecha_ingreso"]
+
+def transform_date(date_obj: str):
+    admited_date_formats = ["%Y-%m-%d %H:%M:%S", "%Y", "ca. %Y", "ca.%Y","c.%Y", "%b. %Y","%d-%m-%Y", "00-%m-%Y", "00-00-%Y",
+                            "%d/%m/%Y","%Y/%m/%d", "%Y-%m-%d", "%Y-%m-00", "%Y-00-00"]
+    # remain null values unchanged
+    if (pd.isna(date_obj)): return date_obj
+
+    # pass number values to string and remove spaces
+    date_obj = str(date_obj).strip()
+    
+    # Parse the input string into a datetime object (local timezone assumed)
+    for format in admited_date_formats:
+        try: 
+            date_obj = datetime.strptime(date_obj, format)
+            break
+        except ValueError as e:
+            continue
+    
+    if type(date_obj) != datetime:
+        if (type(date_obj) == str):
+            print(date_obj)
+            pass
+        return date_obj
+
+    # Get the current local timezone
+    local_tz = datetime.now().astimezone().tzinfo
+
+    # Localize the datetime object to the local timezone
+    localized_date = date_obj.replace(tzinfo=local_tz)
+
+    # Format the datetime object to the desired output format
+    formatted_date = localized_date.strftime("%Y-%m-%d")  
+    
+    # Append the "Z" to indicate UTC offset
+    return formatted_date
 
 # untracked = [x for x in total if x not in ATRIBUTOS_COMPONENTES + ATRIBUTOS_PIEZAS]
 # print(untracked)
@@ -138,6 +173,13 @@ def add_reference_and_create_table(df: pd.DataFrame, column_name, name_id_dict):
 def main(WB_PATH):
     dataframe = pd.read_excel(WB_PATH)
     dataframe = dataframe.reset_index()
+    
+    dataframe['fecha_ingreso_text'] = dataframe['fecha_ingreso']
+    for column in DATE_COLUMNS:
+        #dataframe[column] = pd.to_datetime(dataframe[column], errors='ignore')
+        dataframe[column] = dataframe[column].apply(transform_date)
+    #print(dataframe[DATE_COLUMNS])
+
     # cleans spaces in string fields
     dataframe = dataframe.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
 

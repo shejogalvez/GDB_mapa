@@ -31,8 +31,8 @@ SET n.numero_de_registro_anterior = row.`numero_de registro_anterior`,
     n.avaluo =                      row.avaluo,
     n.procedencia =                 row.tipo,
     n.donante =                     row.procedencia,
-    n.fecha_ingreso =               CASE WHEN n.fecha_ingreso IS NULL THEN NULL ELSE date(datetime({epochmillis: apoc.date.parse(row.fecha_ingreso, "ms", "dd/MM/yyyy")})) END,
-    n.fecha_ingreso_text =          row.fecha_ingreso
+    n.fecha_ingreso =               row.fecha_ingreso,
+    n.fecha_ingreso_text =          row.fecha_ingreso_text
 WITH n, row
 MATCH (b:pais {name: row.pais})
 CREATE (n)-[:de_pais ]->(b)
@@ -59,7 +59,7 @@ SET n.nombre_comun =           row.nombre_comun,
     n.descripcion_col =        row.descripcion_col,
     n.descripcion_cr =         row.descripcion_cr,
     n.responsable_coleccion =  row.responsable_coleccion,
-    n.fecha_ultima_modificacion = CASE WHEN n.fecha_ultima_modificacion IS NULL THEN NULL ELSE date(datetime({epochmillis: apoc.date.parse(row.fecha_ultima_modificacion, "ms", "dd/MM/yyyy")})) END
+    n.fecha_ultima_modificacion = row.fecha_ultima_modificacion
 WITH n, row
 MATCH (pieza:pieza {id: row.numero_de_inventario})
 CREATE (pieza)-[:compuesto_por ]->(n);
