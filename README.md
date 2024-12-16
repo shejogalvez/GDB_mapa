@@ -31,12 +31,15 @@ python excel_to_neo4j_csv.py "2024 Inventario Colecciones MAPA-PCMAPA (1).xlsx" 
 
 Para correr la aplicación primero se debe realizar un build de los containers de Docker. Para ello se debe ejecutar el comando `docker-compose up` en la misma carpeta que está el archivo `docker-compose.yml` para buildear y correr la aplicación.
 
-Es necesario tener un archivo `.env` que debe tener el formato (Las credenciales de NEO4J_AUTH pueden ser cualquiera al momento de inicializar la db):
+Es necesario tener un archivo `.env` que debe tener el formato (Las credenciales de NEO4J_AUTH, ADMIN_USER y ADMIN_PASSWORD pueden ser cualquiera al momento de inicializar la db, pero estos se mantienen una vez inicializada la aplicación):
 ```
 NEO4J_AUTH="{user}/{password}"
 dbms.security.procedures.unrestricted=apoc.*
 apoc.import.file.enabled=true
 dbms.security.allow_csv_import_from_file_urls=true
+
+ADMIN_USER="{user}"
+ADMIN_PASSWORD="{password}"
 
 API_SECRET= "{string}"
 UPLOAD_PATH="{path}"
