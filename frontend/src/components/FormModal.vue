@@ -283,7 +283,10 @@ export default {
         async submitForm() {
             let pieceData = this.pieceData;
             if (this.rules.some((rule) => rule(pieceData.properties.id) !== true)) return
-            console.log(pieceData);
+
+            const data = new FormData();
+
+            // turn form fields to json string and add to formdata
             const body = JSON.stringify({
                 id: pieceData.id,
                 properties: pieceData.properties,
@@ -294,13 +297,13 @@ export default {
                     connected_nodes: this.parseComponentSubnodes(component.connected_nodes)
                 }))
             });
-            console.log(body);
-            const data = new FormData();
             data.append('node_create', body);
-            //data.append('images', this.uploadedFiles); //no funco
+
+            //add piece files to formdata
             for (let i=0; i<pieceData.uploadedFiles.length; i++) {
                 data.append('images', pieceData.uploadedFiles[i]);
             }
+            //add component files to formdata
             for (let i=0; i<pieceData.components.length; i++) {
                 const component = pieceData.components[i];
                 //console.log(component);
@@ -319,7 +322,6 @@ export default {
                         'Content-Type': 'multipart/form-data'
                     }
                 })
-                console.log(response);
                 if (!response.data.status_code){
                     this.exitForm();
                     this.$emit('success');
