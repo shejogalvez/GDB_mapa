@@ -327,15 +327,16 @@ def create_node_and_connect_nodes_to_self(label: NodeLabel, connected_nodes_elem
     print(properties)
     properties_query = parse_properties(properties)
     query = f"""CREATE (n :{label} {properties_query})"""
+    ids_dict = {f"id{index}": id for index, (id, _) in enumerate(connected_nodes_elementids)}
     connect_to_nodes_query = "".join([
         f"""
         WITH n 
-        MATCH (other) WHERE elementid(other) = "{id}"
+        MATCH (other) WHERE elementid(other) = $id{index}
         CREATE (other) -[:{NODES_RELATIONS[(other_label, label)]}]-> (n)"""
-    for id, other_label in connected_nodes_elementids])
-    query += connect_to_nodes_query
-    print(query)
-    return run_query(query, **properties)
+    for index, (id, other_label) in enumerate(connected_nodes_elementids)])
+    query += connect_to_nodes_query + "RETURN n"
+    print(query, ids_dict)
+    return run_query(query, **ids_dict, **properties)
 
 def get_user(username: str) -> Record | None:
     "Retorna el primer usuario con user.username == ``username``, None si no existe"
@@ -439,7 +440,7 @@ def delete_image_by_filename(filename: str, tx: Transaction=None):
     print(query, filename)
     return run_query(query, filename=filename, tx=tx)
 
-def delete_node_by_id_key(labels: list[str], key: str, val: Any, tx: Transaction = None):
+def delete_node_by_id_key(labels: list[NodeLabel], key: str, val: Any, tx: Transaction = None):
     query = f"""
             MATCH (n {parse_labels(labels)})
             WHERE n[$key] = $val
@@ -459,6 +460,7 @@ def create_log(log: Log, tx: Transaction=None):
     query = """
             MATCH (user :user {username: $username}), (n) WHERE elementid(n) = $node_id
             CREATE (n) <-[l:log {endpoint: $endpoint, request_method: $request_method, request_body: $request_body}]- (user)
+            SET l.timestamp = datetime()
             RETURN properties(l)
             """
     result = run_query(query, username=log.username, 
