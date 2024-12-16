@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, List, Literal, IO, Any
+from typing import Annotated, Optional, List, Literal, IO, Any, Callable
 from fastapi import FastAPI, Query, Depends, Body, File, Form, UploadFile, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -81,7 +81,46 @@ def upload_file(file: UploadFile, relative_path: str):
     with open(destination_path, 'wb') as dest_file:
         shutil.copyfileobj(file.file, dest_file)
 
-def attach_files_subnode_to_node(node_data: NodeCreate, files: List[UploadFile], subnode_label: NodeLabel = "imagen", prefix: str = ""):
+def validate_file(accepted_file_types: list[str], max_file_size: int = 8388608) -> Callable[[IO], None]:
+    def validate_file_size_type(file: IO):
+        FILE_SIZE = max_file_size # 8MB
+
+        file_info = filetype.guess(file.file)
+        if file_info is None:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Unable to determine file type",
+            )
+
+        detected_content_type = file_info.extension.lower()
+
+        if (
+            file.content_type not in accepted_file_types
+            or detected_content_type not in accepted_file_types
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Unsupported file type",
+            )
+        
+        if file.size > FILE_SIZE:
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Too large")
+    return validate_file_size_type
+
+validate_images = validate_file(accepted_file_types = [
+    "image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif", "image/heics", "png","jpeg", "jpg", "heic", "heif", "heics" 
+])
+
+validate_docs = validate_file(accepted_file_types = [
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/pdf", "application/msword", "text/plain",                     # TXT
+    "application/vnd.oasis.opendocument.text", "pdf", "docx", "doc", "txt", "odt"
+])
+
+def attach_files_subnode_to_node(node_data: NodeCreate,
+                                 files: List[UploadFile],
+                                 subnode_label: NodeLabel = "imagen",
+                                 prefix: str = "",
+                                 validate_function: Callable = validate_images):
     if not files: return
     if type(node_data) == PieceCreate:
         mainnode_label = 'pieza'
@@ -89,7 +128,7 @@ def attach_files_subnode_to_node(node_data: NodeCreate, files: List[UploadFile],
         mainnode_label = 'componente'
     relation_label = NODES_RELATIONS[(mainnode_label, subnode_label)]
     for file in files:
-        validate_file_size_type(file)
+        validate_function(file)
         relative_path = f"{prefix}_{str(datetime.now())}{file.filename}"
         upload_file(file, relative_path)
         file_properties = {"size" : file.size, "name" : file.filename}
@@ -117,33 +156,6 @@ def delete_images(node_with_images: NodeCreate, tg: asyncio.TaskGroup):
     for image in filter(lambda node: node.node_label == 'imagen', node_with_images.connected_nodes):
         tg.create_task(os.remove(image.properties['filename']))
 
-def validate_file_size_type(file: IO):
-    FILE_SIZE = 8388608 # 8MB
-
-    accepted_file_types = ["image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif", "image/heics", "png",
-                          "jpeg", "jpg", "heic", "heif", "heics" 
-                          ] 
-    file_info = filetype.guess(file.file)
-    if file_info is None:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unable to determine file type",
-        )
-
-    detected_content_type = file_info.extension.lower()
-
-    if (
-        file.content_type not in accepted_file_types
-        or detected_content_type not in accepted_file_types
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported file type",
-        )
-    
-    if file.size > FILE_SIZE:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Too large")
-
 # TEST ROUTE
 @app.get("/")
 async def root():
@@ -163,6 +175,10 @@ async def get_nodes_tree(labels: Annotated[list[NodeLabel], Query()], rel_label:
 @app.delete("/nodes", dependencies=[Depends(get_read_permission_user)])
 async def delete_node(element_id: str):
     return db.delete_node_by_elementid(element_id)
+
+@app.delete("/nodes/id", dependencies=[Depends(get_read_permission_user)])
+async def delete_node_by_key(label: NodeLabel, key: str, val: Any):
+    return db.delete_node_by_id_key(labels=[label], key=key, val=val)
 
 @app.get("/pieces/", dependencies=[Depends(get_read_permission_user)])
 async def get_pieces(skip: int = 0, limit: int = 50):
@@ -217,7 +233,7 @@ def add_piece(request: Request,
     parsed_component_interventions = parse_component_files(component_interventions, len(node_create.components))
     for i, component in enumerate(node_create.components):
         attach_files_subnode_to_node(component, parsed_component_images[i])
-        attach_files_subnode_to_node(component, parsed_component_interventions[i], subnode_label='intervencion', prefix='intervenciones/')
+        attach_files_subnode_to_node(component, parsed_component_interventions[i], subnode_label='intervencion', prefix='intervenciones/', validate_function=validate_docs)
     #print(node_create.components)
     with db.Tx() as tx:
         try:
@@ -354,7 +370,3 @@ def add_exposicion(piezas_element_ids: Annotated[list[str], Body(...)],
                    properties: Annotated[dict[str, Any], Body(...)]):
     id_label_list = [(id, "pieza") for id in piezas_element_ids]
     return db.create_node_and_connect_nodes_to_self("exposicion", id_label_list, **properties)
-
-@app.get("/test", response_model=datetime)
-def get_date() -> datetime:
-    return datetime(year=2024, month=12, day=16)
