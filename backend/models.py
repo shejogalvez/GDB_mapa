@@ -33,15 +33,14 @@ class SubNode(BaseModel):
         - DETACH: Deletes conection with subnode if exists
         - MERGE : Creates connection between subnode and main node if subnode with same node_id isn't already connected"""
     node_id: Optional[str] = None 
-    properties: Optional[dict[str, Any]] = None
-    #relation_label: Optional[str] = None
+    properties: Optional[dict[str, Any]] = {}
     node_label: Optional[NodeLabel] = None
     id_key: Optional[str] = None
     method: Literal['DELETE', 'UPDATE', 'CREATE', 'DETACH', 'MERGE'] = 'UPDATE'
 
 class NodeCreate(BaseModel):
     id: Optional[str] = None
-    properties: Optional[dict[str, Any]] = None # Properties to update on the main node
+    properties: Optional[dict[str, Any]] = {} # Properties to update on the main node
     connected_nodes: list[SubNode]  # Each connected node and its properties
     
     @model_validator(mode='before')
